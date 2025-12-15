@@ -7,7 +7,7 @@ import { COMPONENTS } from './engine/constants'
 import { useCanvas } from './hooks/useCanvas'
 
 const App = () => {
-  const { canvasRef, ready } = useCanvas()
+  const { canvasRef, ready, dpr } = useCanvas()
   const worldRef = useRef<World | null>(null)
 
   useEffect(() => {
@@ -18,7 +18,7 @@ const App = () => {
     worldRef.current = world
 
     const { update: movementUpdate } = createMovementSystem()
-    const { update: renderUpdate } = createRenderSystem(canvas, player)
+    const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, smoothing: 0.12 })
 
     // input state
     const keys = { up: false, down: false, left: false, right: false }
