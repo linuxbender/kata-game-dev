@@ -1,6 +1,6 @@
 // Simple generic QuadTree implementation for spatial partitioning.
 // Arrow-style factory returning an object with insert/clear/query/update/remove methods.
-// Adds merge-threshold and batch rebalancing options for performance and stability.
+// Adds merge-threshold, batch rebalancing and auto-tuning based on runtime metrics.
 
 export type Rect = { x: number; y: number; w: number; h: number }
 export type PointItem = { x: number; y: number; entity: number }
@@ -8,6 +8,21 @@ export type PointItem = { x: number; y: number; entity: number }
 export type QuadOptions = {
   mergeThreshold?: number // fraction [0..1] average occupancy per child under which merging is allowed (default 0.25)
   rebalanceInterval?: number // number of operations after which a batch rebalance is triggered (default 256)
+  autoTune?: {
+    enabled?: boolean
+    intervalOps?: number // how often auto-tune runs (ops)
+    targetOccupancyFraction?: number // desired occupancy fraction of capacity per child (0..1)
+  }
+}
+
+export type QuadMetrics = {
+  opCounter: number
+  splits: number
+  merges: number
+  nodes: number
+  items: number
+  avgItemsPerNode: number
+  avgChildOccupancy?: number
 }
 
 export const createQuadTree = <T extends { x: number; y: number; entity: number } = PointItem>(
@@ -25,8 +40,12 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
     parent?: Node | null
   }
 
-  const mergeThreshold = options?.mergeThreshold ?? 0.25
-  const rebalanceInterval = options?.rebalanceInterval ?? 256
+  // Tuning parameters
+  let mergeThreshold = options?.mergeThreshold ?? 0.25
+  let rebalanceInterval = options?.rebalanceInterval ?? 256
+  const autoTuneEnabled = options?.autoTune?.enabled ?? true
+  const autoTuneInterval = options?.autoTune?.intervalOps ?? (rebalanceInterval * 4)
+  const targetOccupancyFraction = options?.autoTune?.targetOccupancyFraction ?? 0.5
 
   const makeNode = (b: Rect, depth = 0, parent: Node | null = null): Node => ({ boundary: b, items: [], divided: false, depth, parent })
 
@@ -35,8 +54,10 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
   // Map to find the node that currently holds an entity for O(1) updates/removals
   const entityMap = new Map<number, Node>()
 
-  // Operation counter for batch rebalancing
+  // Operation & event counters for auto-tuning metrics
   let opCounter = 0
+  let splits = 0
+  let merges = 0
 
   const contains = (r: Rect, p: { x: number; y: number }) => {
     return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h
@@ -77,6 +98,8 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
         entityMap.set(item.entity, node)
       }
     }
+
+    splits++
   }
 
   // Merge child nodes back into parent when underutilized
@@ -91,7 +114,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
 
     // average occupancy per child
     const avgPerChild = totalChildrenItems / 4
-    // if average occupancy per child is below threshold*capacity, we merge
+    // merge if below threshold (relative to capacity)
     if (avgPerChild <= capacity * mergeThreshold) {
       // move all child items into parent
       for (const c of node.children) {
@@ -103,6 +126,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
       // remove children
       node.children = undefined
       node.divided = false
+      merges++
     }
   }
 
@@ -113,6 +137,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
       node.items.push(item)
       entityMap.set(item.entity, node)
       opCounter++
+      maybeAutoTune()
       maybeRebalance()
       return true
     }
@@ -128,6 +153,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
     node.items.push(item)
     entityMap.set(item.entity, node)
     opCounter++
+    maybeAutoTune()
     maybeRebalance()
     return true
   }
@@ -148,6 +174,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
         tryMerge(p)
         p = p.parent
       }
+      maybeAutoTune()
       maybeRebalance()
       return true
     }
@@ -162,6 +189,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
       }
       entityMap.delete(entity)
       opCounter++
+      maybeAutoTune()
       maybeRebalance()
       return true
     }
@@ -186,6 +214,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
         item.x = x
         item.y = y
         opCounter++
+        maybeAutoTune()
         maybeRebalance()
         return true
       }
@@ -199,6 +228,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
         tryMerge(p)
         p = p.parent
       }
+      maybeAutoTune()
       maybeRebalance()
       return true
     }
@@ -221,6 +251,8 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
     clearNode(root)
     entityMap.clear()
     opCounter = 0
+    splits = 0
+    merges = 0
   }
 
   const queryNode = (node: Node, range: Rect, found: T[]) => {
@@ -244,6 +276,71 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
 
   const has = (entity: number) => entityMap.has(entity)
 
+  // Compute metrics by traversing the tree
+  const computeMetrics = (): QuadMetrics => {
+    let nodes = 0
+    let items = 0
+    let childOccupancySum = 0
+    let childCounted = 0
+
+    const walk = (node: Node) => {
+      nodes++
+      items += node.items.length
+      if (node.divided && node.children) {
+        let totalChildrenItems = 0
+        for (const c of node.children) totalChildrenItems += c.items.length
+        childOccupancySum += totalChildrenItems / 4
+        childCounted++
+        for (const c of node.children) walk(c)
+      }
+    }
+
+    walk(root)
+
+    const avgItemsPerNode = nodes ? items / nodes : 0
+    const avgChildOccupancy = childCounted ? childOccupancySum / childCounted : undefined
+
+    return {
+      opCounter,
+      splits,
+      merges,
+      nodes,
+      items,
+      avgItemsPerNode,
+      avgChildOccupancy
+    }
+  }
+
+  // Auto-tune algorithm: adjust mergeThreshold and rebalanceInterval based on metrics
+  const autoTune = () => {
+    if (!autoTuneEnabled) return
+    const m = computeMetrics()
+
+    // If there are no child nodes, not much to tune
+    if (!m.avgChildOccupancy) return
+
+    // Compare observed avg child occupancy to target (in logical units: items per child)
+    const target = capacity * targetOccupancyFraction
+    const observed = m.avgChildOccupancy
+
+    // Adjust mergeThreshold slightly towards a value where observed ~= target
+    // If observed << target => increase mergeAggressiveness (raise mergeThreshold)
+    // If observed >> target => decrease mergeThreshold
+    const ratio = observed / (target || 1)
+    const adjustFactor = Math.min(1.2, Math.max(0.8, 1 / (ratio || 1))) // clamp small adjustments
+    mergeThreshold = Math.max(0.05, Math.min(0.9, mergeThreshold * adjustFactor))
+
+    // Adjust rebalanceInterval based on merge rate: if many merges happening, rebalance more often
+    const mergeRate = m.merges / Math.max(1, m.opCounter)
+    if (mergeRate > 0.01) {
+      // too many merges: rebalance more often (reduce interval)
+      rebalanceInterval = Math.max(16, Math.floor(rebalanceInterval * 0.8))
+    } else if (mergeRate < 0.001) {
+      // too few merges: increase interval to save CPU
+      rebalanceInterval = Math.min(4096, Math.floor(rebalanceInterval * 1.25))
+    }
+  }
+
   // Rebalance: walk the tree bottom-up and attempt merges where threshold applies
   const rebalanceNode = (node: Node) => {
     if (!node.divided || !node.children) return
@@ -258,5 +355,19 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
     }
   }
 
-  return { insert, remove, update, clear, query, getRoot, has }
+  const maybeAutoTune = () => {
+    if (!autoTuneEnabled) return
+    if (opCounter >= autoTuneInterval) {
+      autoTune()
+      // reset opCounter so tuning interval repeats
+      opCounter = 0
+      // reset split/merge counters to keep rates recent
+      splits = 0
+      merges = 0
+    }
+  }
+
+  const getMetrics = (): QuadMetrics => computeMetrics()
+
+  return { insert, remove, update, clear, query, getRoot, has, getMetrics }
 }
