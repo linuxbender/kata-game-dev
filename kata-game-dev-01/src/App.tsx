@@ -18,7 +18,7 @@ const App = () => {
     worldRef.current = world
 
     const { update: movementUpdate } = createMovementSystem()
-    const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, smoothing: 0.12 })
+    const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, dampingSeconds: 0.12 })
 
     // input state
     const keys = { up: false, down: false, left: false, right: false }
@@ -63,7 +63,8 @@ const App = () => {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
       movementUpdate(world, dt)
-      renderUpdate(world, dt)
+      // pass logical canvas size for culling calculation
+      renderUpdate(world, dt, { width: canvas.width / dpr, height: canvas.height / dpr })
       if (running) requestAnimationFrame(frame)
     }
     requestAnimationFrame(frame)

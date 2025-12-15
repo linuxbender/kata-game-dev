@@ -4,6 +4,7 @@ export type Size = { width: number; height: number }
 
 // Hook to manage a canvas ref and automatically resize it on window changes.
 // Also supports high-DPI by adjusting the backing buffer using devicePixelRatio.
+// Listens for DPR changes via matchMedia and reconfigures the canvas when that occurs.
 export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [canvasSize, setCanvasSize] = useState<Size>({
@@ -16,7 +17,9 @@ export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
   const [dpr, setDpr] = useState<number>(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
 
   useEffect(() => {
-    const resize = () => {
+    let mq: MediaQueryList | null = null
+
+    const configure = () => {
       const width = window.innerWidth
       const height = window.innerHeight
       const devicePixelRatio = window.devicePixelRatio || 1
@@ -35,12 +38,30 @@ export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
       }
 
       if (!ready) setReady(true)
+
+      // Remove previous media query listener and create a new one for current DPR
+      if (mq) {
+        try { mq.removeEventListener('change', configure) } catch (e) { /* old browsers */ }
+        mq = null
+      }
+      try {
+        mq = window.matchMedia(`(resolution: ${devicePixelRatio}dppx)`)
+        mq.addEventListener('change', configure)
+      } catch (e) {
+        // matchMedia may not support addEventListener in older browsers; ignore
+      }
     }
 
-    // set initial size and attach listener
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
+    // initial configuration and attach window resize
+    configure()
+    window.addEventListener('resize', configure)
+
+    return () => {
+      window.removeEventListener('resize', configure)
+      if (mq) {
+        try { mq.removeEventListener('change', configure) } catch (e) { /* ignore */ }
+      }
+    }
   }, [])
 
   return { canvasRef, canvasSize, ready, dpr }
