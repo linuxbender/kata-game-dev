@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import { createWorld } from './game/setupWorld'
 import { createMovementSystem } from './engine/systems/MovementSystem'
 import { createRenderSystem } from './engine/systems/RenderSystem'
+import { createQuadTree } from './engine/spatial/QuadTree'
 import type { World } from './engine/ECS'
 import { COMPONENTS } from './engine/constants'
 import { useCanvas } from './hooks/useCanvas'
@@ -18,7 +19,9 @@ const App = () => {
     worldRef.current = world
 
     const { update: movementUpdate } = createMovementSystem()
-    const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, dampingSeconds: 0.12 })
+    // Create a spatial index covering a large world area (adjust as needed)
+    const quad = createQuadTree({ x: -10000, y: -10000, w: 20000, h: 20000 }, 8, 8)
+    const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, dampingSeconds: 0.12 }, quad)
 
     // input state
     const keys = { up: false, down: false, left: false, right: false }
@@ -63,6 +66,14 @@ const App = () => {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
       movementUpdate(world, dt)
+      // Rebuild spatial index each frame (clear + insert). For large worlds, consider incremental updates.
+      quad.clear()
+      const ents = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
+      for (const e of ents) {
+        const t = e.comps[0] as { x: number; y: number }
+        quad.insert({ x: t.x, y: t.y, entity: e.entity })
+      }
+
       // pass logical canvas size for culling calculation
       renderUpdate(world, dt, { width: canvas.width / dpr, height: canvas.height / dpr })
       if (running) requestAnimationFrame(frame)

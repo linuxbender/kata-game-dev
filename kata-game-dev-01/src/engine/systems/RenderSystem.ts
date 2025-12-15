@@ -7,6 +7,10 @@ export type RenderOptions = {
   dpr?: number
 }
 
+export type SpatialIndex = {
+  query: (range: { x: number; y: number; w: number; h: number }) => { x: number; y: number; entity: number }[]
+}
+
 // Helper: compute exponential smoothing factor for given dt and dampingSeconds
 const smoothingFactor = (dt: number, dampingSeconds: number) => {
   // Convert dampingSeconds to a lerp alpha: alpha = 1 - exp(-dt / tau)
@@ -16,7 +20,12 @@ const smoothingFactor = (dt: number, dampingSeconds: number) => {
 
 // Render system factory: draws entities and follows the player smoothly with damping.
 // Also performs simple frustum culling using canvasSize to skip off-screen entities.
-export const createRenderSystem = (canvas: HTMLCanvasElement, playerEntity?: Entity, options?: RenderOptions) => {
+export const createRenderSystem = (
+  canvas: HTMLCanvasElement,
+  playerEntity?: Entity,
+  options?: RenderOptions,
+  spatialIndex?: SpatialIndex
+) => {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('2D context not available')
 
@@ -67,24 +76,47 @@ export const createRenderSystem = (canvas: HTMLCanvasElement, playerEntity?: Ent
     const minY = camY - halfH
     const maxY = camY + halfH
 
-    // Draw renderables but skip those outside the view (simple culling)
-    const renderables = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
-    for (const r of renderables) {
-      const t = r.comps[0] as { x: number; y: number }
-      const rend = r.comps[1] as { color: string; size: number }
+    // If a spatial index is provided, query it for candidate entities inside the view rect
+    let candidates: { x: number; y: number; entity: number }[] = []
+    if (spatialIndex) {
+      candidates = spatialIndex.query({ x: minX, y: minY, w: viewW, h: viewH })
+    }
 
-      // Simple AABB culling using entity size
-      const s = rend.size
-      if (t.x + s < minX || t.x - s > maxX || t.y + s < minY || t.y - s > maxY) continue
+    if (candidates.length) {
+      // Draw only candidate entities
+      for (const c of candidates) {
+        const ent = c.entity
+        const t = world.getComponent<{ x: number; y: number }>(ent, COMPONENTS.TRANSFORM)
+        const rend = world.getComponent<{ color: string; size: number }>(ent, COMPONENTS.RENDERABLE)
+        if (!t || !rend) continue
 
-      // Convert world position to screen position (logical pixels)
-      const screenX = Math.round((t.x - camX) + viewW / 2)
-      const screenY = Math.round((t.y - camY) + viewH / 2)
+        const screenX = Math.round((t.x - camX) + viewW / 2)
+        const screenY = Math.round((t.y - camY) + viewH / 2)
+        ctx.fillStyle = rend.color
+        ctx.beginPath()
+        ctx.arc(screenX, screenY, rend.size, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    } else {
+      // Fallback: query all renderables from world
+      const renderables = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
+      for (const r of renderables) {
+        const t = r.comps[0] as { x: number; y: number }
+        const rend = r.comps[1] as { color: string; size: number }
 
-      ctx.fillStyle = rend.color
-      ctx.beginPath()
-      ctx.arc(screenX, screenY, rend.size, 0, Math.PI * 2)
-      ctx.fill()
+        // Simple AABB culling using entity size
+        const s = rend.size
+        if (t.x + s < minX || t.x - s > maxX || t.y + s < minY || t.y - s > maxY) continue
+
+        // Convert world position to screen position (logical pixels)
+        const screenX = Math.round((t.x - camX) + viewW / 2)
+        const screenY = Math.round((t.y - camY) + viewH / 2)
+
+        ctx.fillStyle = rend.color
+        ctx.beginPath()
+        ctx.arc(screenX, screenY, rend.size, 0, Math.PI * 2)
+        ctx.fill()
+      }
     }
   }
 
