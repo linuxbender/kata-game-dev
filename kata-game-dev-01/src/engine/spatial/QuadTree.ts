@@ -1,18 +1,32 @@
-// Simple QuadTree implementation for spatial partitioning.
+// Simple generic QuadTree implementation for spatial partitioning.
 // Arrow-style factory returning an object with insert/clear/query/update/remove methods.
+// Adds merge-threshold and batch rebalancing options for performance and stability.
 
 export type Rect = { x: number; y: number; w: number; h: number }
 export type PointItem = { x: number; y: number; entity: number }
 
-export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
+export type QuadOptions = {
+  mergeThreshold?: number // fraction [0..1] average occupancy per child under which merging is allowed (default 0.25)
+  rebalanceInterval?: number // number of operations after which a batch rebalance is triggered (default 256)
+}
+
+export const createQuadTree = <T extends { x: number; y: number; entity: number } = PointItem>(
+  boundary: Rect,
+  capacity = 8,
+  maxDepth = 8,
+  options?: QuadOptions
+) => {
   type Node = {
     boundary: Rect
-    items: PointItem[]
+    items: T[]
     divided: boolean
     children?: [Node, Node, Node, Node]
     depth: number
     parent?: Node | null
   }
+
+  const mergeThreshold = options?.mergeThreshold ?? 0.25
+  const rebalanceInterval = options?.rebalanceInterval ?? 256
 
   const makeNode = (b: Rect, depth = 0, parent: Node | null = null): Node => ({ boundary: b, items: [], divided: false, depth, parent })
 
@@ -21,7 +35,10 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
   // Map to find the node that currently holds an entity for O(1) updates/removals
   const entityMap = new Map<number, Node>()
 
-  const contains = (r: Rect, p: PointItem) => {
+  // Operation counter for batch rebalancing
+  let opCounter = 0
+
+  const contains = (r: Rect, p: { x: number; y: number }) => {
     return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h
   }
 
@@ -69,10 +86,13 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     for (const c of node.children) if (c.divided) return
 
     // count total items in children
-    let total = node.items.length
-    for (const c of node.children) total += c.items.length
+    let totalChildrenItems = 0
+    for (const c of node.children) totalChildrenItems += c.items.length
 
-    if (total <= capacity) {
+    // average occupancy per child
+    const avgPerChild = totalChildrenItems / 4
+    // if average occupancy per child is below threshold*capacity, we merge
+    if (avgPerChild <= capacity * mergeThreshold) {
       // move all child items into parent
       for (const c of node.children) {
         for (const it of c.items) {
@@ -86,12 +106,14 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     }
   }
 
-  const insertNode = (node: Node, item: PointItem): boolean => {
+  const insertNode = (node: Node, item: T): boolean => {
     if (!contains(node.boundary, item)) return false
 
     if (node.items.length < capacity || node.depth >= maxDepth) {
       node.items.push(item)
       entityMap.set(item.entity, node)
+      opCounter++
+      maybeRebalance()
       return true
     }
 
@@ -105,10 +127,12 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     // fallback (shouldn't usually happen)
     node.items.push(item)
     entityMap.set(item.entity, node)
+    opCounter++
+    maybeRebalance()
     return true
   }
 
-  const insert = (item: PointItem) => insertNode(root, item)
+  const insert = (item: T) => insertNode(root, item)
 
   const remove = (entity: number) => {
     const node = entityMap.get(entity)
@@ -117,12 +141,14 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     if (idx >= 0) {
       node.items.splice(idx, 1)
       entityMap.delete(entity)
+      opCounter++
       // attempt to merge up the tree
       let p = node.parent
       while (p) {
         tryMerge(p)
         p = p.parent
       }
+      maybeRebalance()
       return true
     }
     // If not found in the recorded node (shouldn't happen), search whole tree
@@ -135,6 +161,8 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
         if (j >= 0) n.items.splice(j, 1)
       }
       entityMap.delete(entity)
+      opCounter++
+      maybeRebalance()
       return true
     }
 
@@ -145,7 +173,7 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     const node = entityMap.get(entity)
     if (!node) {
       // Not present, insert fresh
-      insert({ x, y, entity })
+      insert({ x, y, entity } as T)
       return true
     }
 
@@ -157,23 +185,26 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
       if (x >= node.boundary.x && x <= node.boundary.x + node.boundary.w && y >= node.boundary.y && y <= node.boundary.y + node.boundary.h) {
         item.x = x
         item.y = y
+        opCounter++
+        maybeRebalance()
         return true
       }
       // Otherwise remove and re-insert from root
       node.items.splice(idx, 1)
       entityMap.delete(entity)
-      insert({ x, y, entity })
+      insert({ x, y, entity } as T)
       // attempt merges up the old parent
       let p = node.parent
       while (p) {
         tryMerge(p)
         p = p.parent
       }
+      maybeRebalance()
       return true
     }
 
     // Not found in node.items (shouldn't happen) — fallback to insert
-    insert({ x, y, entity })
+    insert({ x, y, entity } as T)
     return true
   }
 
@@ -189,9 +220,10 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
   const clear = () => {
     clearNode(root)
     entityMap.clear()
+    opCounter = 0
   }
 
-  const queryNode = (node: Node, range: Rect, found: PointItem[]) => {
+  const queryNode = (node: Node, range: Rect, found: T[]) => {
     if (!intersects(node.boundary, range)) return found
 
     for (const it of node.items) {
@@ -211,6 +243,20 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
   const getRoot = () => root
 
   const has = (entity: number) => entityMap.has(entity)
+
+  // Rebalance: walk the tree bottom-up and attempt merges where threshold applies
+  const rebalanceNode = (node: Node) => {
+    if (!node.divided || !node.children) return
+    for (const c of node.children) rebalanceNode(c)
+    tryMerge(node)
+  }
+
+  const maybeRebalance = () => {
+    if (opCounter >= rebalanceInterval) {
+      rebalanceNode(root)
+      opCounter = 0
+    }
+  }
 
   return { insert, remove, update, clear, query, getRoot, has }
 }

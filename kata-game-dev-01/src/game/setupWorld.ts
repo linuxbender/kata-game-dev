@@ -1,7 +1,7 @@
 import { World, Entity } from '../engine/ECS'
 import { COMPONENTS } from '../engine/constants'
 
-export type QuadConfig = { boundary: { x: number; y: number; w: number; h: number }; capacity?: number; maxDepth?: number }
+export type QuadConfig = { boundary: { x: number; y: number; w: number; h: number }; capacity?: number; maxDepth?: number; mergeThreshold?: number; rebalanceInterval?: number }
 
 // Initialize a world with a player entity and several NPCs.
 // Returns the world, player entity and a recommended quadtree configuration.
@@ -23,7 +23,14 @@ export const createWorld = (): { world: World; player: Entity; quadConfig: QuadC
   }
 
   // Recommended QuadTree config (centered large bounds). Adjust these values as needed.
-  const quadConfig: QuadConfig = { boundary: { x: -5000, y: -5000, w: 10000, h: 10000 }, capacity: 8, maxDepth: 8 }
+  const quadConfig: QuadConfig = {
+    boundary: { x: -5000, y: -5000, w: 10000, h: 10000 },
+    capacity: 8,
+    maxDepth: 8,
+    // QuadTree tuning options
+    mergeThreshold: 0.25,
+    rebalanceInterval: 256
+  }
 
   return { world, player, quadConfig }
 }

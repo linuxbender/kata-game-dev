@@ -20,7 +20,7 @@ const App = () => {
 
     const { update: movementUpdate } = createMovementSystem()
     // Initialize spatial index using recommended quadConfig from game setup
-    const quad = createQuadTree(quadConfig.boundary, quadConfig.capacity ?? 8, quadConfig.maxDepth ?? 8)
+    const quad = createQuadTree(quadConfig.boundary, quadConfig.capacity ?? 8, quadConfig.maxDepth ?? 8, { mergeThreshold: quadConfig.mergeThreshold, rebalanceInterval: quadConfig.rebalanceInterval })
     const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, dampingSeconds: 0.12 }, quad)
 
     // Track which entities we've inserted into the quad for incremental updates/removals
