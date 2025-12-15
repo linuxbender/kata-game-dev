@@ -13,6 +13,8 @@ export type QuadOptions = {
     intervalOps?: number // how often auto-tune runs (ops)
     targetOccupancyFraction?: number // desired occupancy fraction of capacity per child (0..1)
   }
+  // Optional callback invoked when internal tuning parameters change
+  onConfigChange?: (cfg: { mergeThreshold: number; rebalanceInterval: number }) => void
 }
 
 export type QuadMetrics = {
@@ -339,6 +341,9 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
       // too few merges: increase interval to save CPU
       rebalanceInterval = Math.min(4096, Math.floor(rebalanceInterval * 1.25))
     }
+
+    // Notify external listener about changed config so it can persist.
+    try { options?.onConfigChange?.({ mergeThreshold, rebalanceInterval }) } catch (e) { /* noop */ }
   }
 
   // Rebalance: walk the tree bottom-up and attempt merges where threshold applies
