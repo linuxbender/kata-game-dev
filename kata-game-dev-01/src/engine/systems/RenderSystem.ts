@@ -1,9 +1,10 @@
 import type { World, Entity } from '../ECS'
 import { COMPONENTS } from '../constants'
+import { CameraConfig, DEFAULT_CAMERA_CONFIG, computeSmoothing, lerp, applyDeadZone } from './CameraConfig'
 
 export type RenderOptions = {
-  // smoothing factor interpreted as damping in seconds (smaller is snappier)
-  dampingSeconds?: number
+  // Camera configuration for smooth follow behavior
+  camera?: CameraConfig
   dpr?: number
 }
 
@@ -11,15 +12,8 @@ export type SpatialIndex = {
   query: (range: { x: number; y: number; w: number; h: number }) => { x: number; y: number; entity: number }[]
 }
 
-// Helper: compute exponential smoothing factor for given dt and dampingSeconds
-const smoothingFactor = (dt: number, dampingSeconds: number) => {
-  // Convert dampingSeconds to a lerp alpha: alpha = 1 - exp(-dt / tau)
-  const tau = Math.max(1e-4, dampingSeconds)
-  return 1 - Math.exp(-dt / tau)
-}
-
-// Render system factory: draws entities and follows the player smoothly with damping.
-// Also performs simple frustum culling using canvasSize to skip off-screen entities.
+// Render system factory: draws entities with smooth camera follow (dead zone + predictive).
+// Performs frustum culling and supports spatial indexing for large worlds.
 export const createRenderSystem = (
   canvas: HTMLCanvasElement,
   playerEntity?: Entity,
@@ -29,7 +23,7 @@ export const createRenderSystem = (
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('2D context not available')
 
-  const dampingSeconds = options?.dampingSeconds ?? 0.08 // default damping
+  const cameraConfig = { ...DEFAULT_CAMERA_CONFIG, ...options?.camera }
   let dpr = options?.dpr ?? 1
 
   // Camera state
@@ -47,8 +41,22 @@ export const createRenderSystem = (
     if (playerEntity !== undefined) {
       const t = world.getComponent<{ x: number; y: number }>(playerEntity, COMPONENTS.TRANSFORM)
       if (t) {
-        camXTarget = t.x
-        camYTarget = t.y
+        // Apply look-ahead prediction if velocity is available
+        let targetX = t.x
+        let targetY = t.y
+
+        if (cameraConfig.lookAheadFactor && cameraConfig.lookAheadFactor > 0) {
+          const v = world.getComponent<{ vx: number; vy: number }>(playerEntity, COMPONENTS.VELOCITY)
+          if (v) {
+            // Add velocity-based offset for predictive camera (1-3 frames ahead)
+            const lookAheadDistance = 0.5 // Adjust for desired look-ahead effect
+            targetX += v.vx * cameraConfig.lookAheadFactor * lookAheadDistance
+            targetY += v.vy * cameraConfig.lookAheadFactor * lookAheadDistance
+          }
+        }
+
+        camXTarget = targetX
+        camYTarget = targetY
       }
     } else {
       const transforms = world.query([COMPONENTS.TRANSFORM])
@@ -58,17 +66,25 @@ export const createRenderSystem = (
       }
     }
 
-    // Compute frame-rate independent smoothing alpha and lerp camera
-    const alpha = smoothingFactor(dt, dampingSeconds)
-    camX += (camXTarget - camX) * alpha
-    camY += (camYTarget - camY) * alpha
+    // Apply dead zone to reduce micro-oscillations
+    const dzX = applyDeadZone(camX, camXTarget, cameraConfig.deadZoneRadius ?? 0)
+    const dzY = applyDeadZone(camY, camYTarget, cameraConfig.deadZoneRadius ?? 0)
 
-    // Clear the canvas (physical pixel dimensions)
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // Compute frame-rate independent smoothing alpha and lerp camera
+    const alpha = computeSmoothing(dt, cameraConfig.dampingSeconds ?? 0.12)
+    camX = lerp(camX, dzX, alpha)
+    camY = lerp(camY, dzY, alpha)
+
+    // Clear the canvas using logical dimensions (after applying DPR transform)
+    // canvas.width/height are physical pixels; after ctx.setTransform(dpr,0,0,dpr,0,0)
+    // we need to clear the logical drawing area (width/dpr, height/dpr).
+    const logicalW = canvas.width / dpr
+    const logicalH = canvas.height / dpr
+    ctx.clearRect(0, 0, logicalW, logicalH)
 
     // Determine view bounds in world coordinates (logical pixels)
-    const viewW = (canvasSize ? canvasSize.width : canvas.width / dpr)
-    const viewH = (canvasSize ? canvasSize.height : canvas.height / dpr)
+    const viewW = canvasSize ? canvasSize.width : logicalW
+    const viewH = canvasSize ? canvasSize.height : logicalH
     const halfW = viewW / 2
     const halfH = viewH / 2
     const minX = camX - halfW
@@ -98,7 +114,7 @@ export const createRenderSystem = (
         ctx.fill()
       }
     } else {
-      // Fallback: query all renderables from world
+      // Fallback: query all renderables from world (useful for small scenes)
       const renderables = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
       for (const r of renderables) {
         const t = r.comps[0] as { x: number; y: number }

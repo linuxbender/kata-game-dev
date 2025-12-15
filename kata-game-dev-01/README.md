@@ -41,7 +41,9 @@ This repository is a minimal starter for building a TypeScript + React game usin
   - Handles window resize events and adapts canvas backing store.
 - **Smooth camera follow** with exponential damping (`src/engine/systems/RenderSystem.ts`):
   - Frame-rate independent camera smoothing.
-  - Simple AABB frustum culling to skip rendering off-screen entities.
+  - Dead zone to prevent micro-oscillations.
+  - Optional predictive look-ahead based on velocity.
+  - Configurable dampening (snappy vs. cinematic feel).
 - **ECS event system** (`src/engine/ECS.ts`):
   - Components emit `add`, `update`, `remove` events.
   - External systems (e.g., spatial index) can subscribe to react to changes.
@@ -76,7 +78,6 @@ localStorage.removeItem('kata_quadtree_config_v1')
 - **React 19.2.3** with hooks and context patterns.
 - **Vite 7.3.0** for fast development and optimized builds.
 - Arrow-function style throughout (modern ES6+).
-- All comments in English.
 - Professional code following DRY, SOLID, and ECS design principles.
 
 ## Project structure (full overview)

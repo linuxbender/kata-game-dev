@@ -43,7 +43,15 @@ const App = () => {
         }
       )
 
-      const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, dampingSeconds: 0.12 }, quad)
+      // Initialize render system with smooth camera follow and spatial culling
+      const { update: renderUpdate } = createRenderSystem(canvas, player, {
+        dpr,
+        camera: {
+          dampingSeconds: 0.12,
+          deadZoneRadius: 3,
+          lookAheadFactor: 0.2
+        }
+      }, quad)
 
       // Track entities in quad tree for incremental updates
       const trackedEntities = new Set<number>()

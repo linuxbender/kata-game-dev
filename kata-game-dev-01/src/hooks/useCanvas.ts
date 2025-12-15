@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 export type Size = { width: number; height: number }
 
-// Hook to manage a canvas ref and automatically resize it on window changes.
-// Also supports high-DPI by adjusting the backing buffer using devicePixelRatio.
-// Listens for DPR changes via matchMedia and reconfigures the canvas when that occurs.
+// Hook to manage a canvas ref with automatic resize, high-DPI support, and debounced updates.
+// Handles window resize events, DPR changes, and orientation changes with proper cleanup.
 export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [canvasSize, setCanvasSize] = useState<Size>({
@@ -18,6 +17,15 @@ export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
 
   useEffect(() => {
     let mq: MediaQueryList | null = null
+    let resizeTimeout: number | null = null
+
+    // Debounced resize handler to avoid excessive reconfigurations
+    const debouncedConfigure = () => {
+      if (resizeTimeout !== null) {
+        clearTimeout(resizeTimeout)
+      }
+      resizeTimeout = window.setTimeout(configure, 100) as unknown as number
+    }
 
     const configure = () => {
       const width = window.innerWidth
@@ -54,10 +62,17 @@ export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
 
     // initial configuration and attach window resize
     configure()
-    window.addEventListener('resize', configure)
+    // Use debounced resize to avoid excessive updates during window dragging
+    window.addEventListener('resize', debouncedConfigure)
+    // Listen for orientation changes (important on mobile)
+    window.addEventListener('orientationchange', debouncedConfigure)
 
     return () => {
-      window.removeEventListener('resize', configure)
+      window.removeEventListener('resize', debouncedConfigure)
+      window.removeEventListener('orientationchange', debouncedConfigure)
+      if (resizeTimeout !== null) {
+        clearTimeout(resizeTimeout)
+      }
       if (mq) {
         try { mq.removeEventListener('change', configure) } catch (e) { /* ignore */ }
       }
