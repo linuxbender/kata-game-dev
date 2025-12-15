@@ -11,11 +11,12 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     divided: boolean
     children?: [Node, Node, Node, Node]
     depth: number
+    parent?: Node | null
   }
 
-  const makeNode = (b: Rect, depth = 0): Node => ({ boundary: b, items: [], divided: false, depth })
+  const makeNode = (b: Rect, depth = 0, parent: Node | null = null): Node => ({ boundary: b, items: [], divided: false, depth, parent })
 
-  const root = makeNode(boundary, 0)
+  const root = makeNode(boundary, 0, null)
 
   // Map to find the node that currently holds an entity for O(1) updates/removals
   const entityMap = new Map<number, Node>()
@@ -33,10 +34,10 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     const hw = w / 2
     const hh = h / 2
     node.children = [
-      makeNode({ x: x, y: y, w: hw, h: hh }, node.depth + 1), // nw
-      makeNode({ x: x + hw, y: y, w: hw, h: hh }, node.depth + 1), // ne
-      makeNode({ x: x, y: y + hh, w: hw, h: hh }, node.depth + 1), // sw
-      makeNode({ x: x + hw, y: y + hh, w: hw, h: hh }, node.depth + 1) // se
+      makeNode({ x: x, y: y, w: hw, h: hh }, node.depth + 1, node), // nw
+      makeNode({ x: x + hw, y: y, w: hw, h: hh }, node.depth + 1, node), // ne
+      makeNode({ x: x, y: y + hh, w: hw, h: hh }, node.depth + 1, node), // sw
+      makeNode({ x: x + hw, y: y + hh, w: hw, h: hh }, node.depth + 1, node) // se
     ]
     node.divided = true
 
@@ -58,6 +59,30 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
         node.items.push(item)
         entityMap.set(item.entity, node)
       }
+    }
+  }
+
+  // Merge child nodes back into parent when underutilized
+  const tryMerge = (node: Node) => {
+    if (!node.divided || !node.children) return
+    // if any child is divided, we won't merge
+    for (const c of node.children) if (c.divided) return
+
+    // count total items in children
+    let total = node.items.length
+    for (const c of node.children) total += c.items.length
+
+    if (total <= capacity) {
+      // move all child items into parent
+      for (const c of node.children) {
+        for (const it of c.items) {
+          node.items.push(it)
+          entityMap.set(it.entity, node)
+        }
+      }
+      // remove children
+      node.children = undefined
+      node.divided = false
     }
   }
 
@@ -92,6 +117,12 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
     if (idx >= 0) {
       node.items.splice(idx, 1)
       entityMap.delete(entity)
+      // attempt to merge up the tree
+      let p = node.parent
+      while (p) {
+        tryMerge(p)
+        p = p.parent
+      }
       return true
     }
     // If not found in the recorded node (shouldn't happen), search whole tree
@@ -132,6 +163,12 @@ export const createQuadTree = (boundary: Rect, capacity = 8, maxDepth = 8) => {
       node.items.splice(idx, 1)
       entityMap.delete(entity)
       insert({ x, y, entity })
+      // attempt merges up the old parent
+      let p = node.parent
+      while (p) {
+        tryMerge(p)
+        p = p.parent
+      }
       return true
     }
 

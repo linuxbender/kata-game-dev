@@ -26,6 +26,37 @@ const App = () => {
     // Track which entities we've inserted into the quad for incremental updates/removals
     const trackedEntities = new Set<number>()
 
+    // Initial population of the spatial index from existing entities
+    const initial = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
+    for (const e of initial) {
+      const id = e.entity
+      const t = e.comps[0] as { x: number; y: number }
+      quad.insert({ x: t.x, y: t.y, entity: id })
+      trackedEntities.add(id)
+    }
+
+    // Subscribe to world component events to keep spatial index in sync
+    const unsubscribe = world.onComponentEvent((ev) => {
+      if (ev.name !== COMPONENTS.TRANSFORM) return
+      if (ev.type === 'add') {
+        const id = ev.entity
+        const pos = (ev.component as any)
+        quad.insert({ x: pos.x, y: pos.y, entity: id })
+        trackedEntities.add(id)
+      } else if (ev.type === 'update') {
+        const id = ev.entity
+        const pos = world.getComponent<{ x: number; y: number }>(id, COMPONENTS.TRANSFORM)
+        if (pos) {
+          if (quad.has(id)) quad.update(id, pos.x, pos.y)
+          else { quad.insert({ x: pos.x, y: pos.y, entity: id }); trackedEntities.add(id) }
+        }
+      } else if (ev.type === 'remove') {
+        const id = ev.entity
+        if (quad.has(id)) quad.remove(id)
+        trackedEntities.delete(id)
+      }
+    })
+
     // input state
     const keys = { up: false, down: false, left: false, right: false }
     const SPEED = 150 // units per second
@@ -69,31 +100,6 @@ const App = () => {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
       movementUpdate(world, dt)
-      // Incrementally update quadtree: insert new entities, update existing, remove missing
-      const ents = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
-      const existingThisFrame = new Set<number>()
-      for (const e of ents) {
-        const id = e.entity
-        const t = e.comps[0] as { x: number; y: number }
-        existingThisFrame.add(id)
-        if (!trackedEntities.has(id)) {
-          // new entity -> insert
-          quad.insert({ x: t.x, y: t.y, entity: id })
-          trackedEntities.add(id)
-        } else {
-          // existing -> update position
-          quad.update(id, t.x, t.y)
-        }
-      }
-
-      // Remove entities that no longer exist
-      for (const id of Array.from(trackedEntities)) {
-        if (!existingThisFrame.has(id)) {
-          quad.remove(id)
-          trackedEntities.delete(id)
-        }
-      }
-
       // pass logical canvas size for culling calculation
       renderUpdate(world, dt, { width: canvas.width / dpr, height: canvas.height / dpr })
       if (running) requestAnimationFrame(frame)
@@ -104,6 +110,7 @@ const App = () => {
       running = false
       window.removeEventListener('keydown', keydown)
       window.removeEventListener('keyup', keyup)
+      unsubscribe()
     }
   }, [ready])
 
