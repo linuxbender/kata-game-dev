@@ -2,6 +2,7 @@ import type { World, Entity } from '../ECS'
 import { COMPONENTS } from '../constants'
 import { CameraConfig, DEFAULT_CAMERA_CONFIG, computeSmoothing, lerp, applyDeadZone } from './CameraConfig'
 import { createDebugOverlay } from './DebugOverlay'
+import { createEnemyVisualizationSystem } from './EnemyVisualizationSystem'
 
 export type RenderOptions = {
   // Camera configuration for smooth follow behavior
@@ -141,6 +142,10 @@ export const createRenderSystem = (
     if (debugOverlay && debugOverlay.isEnabled()) {
       debugOverlay.update(world, camX, camY, viewW, viewH, spatialIndex)
     }
+
+    // Draw enemy detection ranges
+    const enemyVisualizationSystem = createEnemyVisualizationSystem()
+    enemyVisualizationSystem.update(ctx, world, camX, camY, viewW, viewH, dpr)
   }
 
   return { update }

@@ -4,7 +4,7 @@ export type Entity = number
 export type ComponentEvent = {
   type: 'add' | 'update' | 'remove'
   entity: Entity
-  name: string
+  name: string  // Flexible: accepts any component name for extensibility
   component?: any
 }
 
@@ -13,14 +13,26 @@ export type ComponentEvent = {
  * Small pragmatic implementation intended for learning and extension.
  * Now supports component events so external systems (e.g., spatial index)
  * can react to component adds/updates/removals.
+ *
+ * Note: Public API accepts string for flexibility, but always use COMPONENTS.<KEY>
+ * from constants.ts in practice for type safety and consistency.
  */
 export class World {
   private nextId = 1
-  private components = new Map<string, Map<Entity, any>>()
+  private components = new Map<string, Map<Entity, any>>()  // Uses string for flexibility
   private listeners = new Set<(e: ComponentEvent) => void>()
+  private elapsedTime = 0  // Track elapsed time for game logic
 
   // Create a new entity id.
   createEntity = (): Entity => this.nextId++
+
+  // Get elapsed time in seconds since world creation
+  getTime = (): number => this.elapsedTime
+
+  // Update world time (called by game loop)
+  updateTime = (dt: number): void => {
+    this.elapsedTime += dt
+  }
 
   // Subscribe to component events. Returns an unsubscribe function.
   onComponentEvent = (cb: (e: ComponentEvent) => void) => {

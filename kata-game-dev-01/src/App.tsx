@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import { createWorld } from './game/setupWorld'
 import { createMovementSystem } from './engine/systems/MovementSystem'
+import { createEnemyAISystem } from './engine/systems/EnemyAISystem'
+import { createEnemyVisualizationSystem } from './engine/systems/EnemyVisualizationSystem'
 import { createRenderSystem } from './engine/systems/RenderSystem'
 import { createQuadTree } from './engine/spatial/QuadTree'
 import { createDebugOverlay } from './engine/systems/DebugOverlay'
@@ -28,6 +30,7 @@ const App = () => {
       worldRef.current = world
 
       const { update: movementUpdate } = createMovementSystem()
+      const { update: enemyAIUpdate } = createEnemyAISystem()
 
       // Initialize quad tree with persisted config merged with defaults
       const quad = createQuadTree(
@@ -138,8 +141,14 @@ const App = () => {
         const dt = Math.min((now - last) / 1000, 0.05)
         last = now
 
+        // Update world time for game logic (cooldowns, timers, etc.)
+        world.updateTime(dt)
+
         // Update movement
         movementUpdate(world, dt)
+
+        // Update enemy AI (targeting, movement, attacks)
+        enemyAIUpdate(world)
 
         // Render frame (pass quad for debug metrics)
         renderUpdate(world, dt, { width: canvas.width / dpr, height: canvas.height / dpr }, quad)
