@@ -15,13 +15,16 @@ const App = () => {
     if (!ready) return
     const canvas = canvasRef.current!
 
-    const { world, player } = createWorld()
+    const { world, player, quadConfig } = createWorld()
     worldRef.current = world
 
     const { update: movementUpdate } = createMovementSystem()
-    // Create a spatial index covering a large world area (adjust as needed)
-    const quad = createQuadTree({ x: -10000, y: -10000, w: 20000, h: 20000 }, 8, 8)
+    // Initialize spatial index using recommended quadConfig from game setup
+    const quad = createQuadTree(quadConfig.boundary, quadConfig.capacity ?? 8, quadConfig.maxDepth ?? 8)
     const { update: renderUpdate } = createRenderSystem(canvas, player, { dpr, dampingSeconds: 0.12 }, quad)
+
+    // Track which entities we've inserted into the quad for incremental updates/removals
+    const trackedEntities = new Set<number>()
 
     // input state
     const keys = { up: false, down: false, left: false, right: false }
@@ -66,12 +69,29 @@ const App = () => {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
       movementUpdate(world, dt)
-      // Rebuild spatial index each frame (clear + insert). For large worlds, consider incremental updates.
-      quad.clear()
+      // Incrementally update quadtree: insert new entities, update existing, remove missing
       const ents = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
+      const existingThisFrame = new Set<number>()
       for (const e of ents) {
+        const id = e.entity
         const t = e.comps[0] as { x: number; y: number }
-        quad.insert({ x: t.x, y: t.y, entity: e.entity })
+        existingThisFrame.add(id)
+        if (!trackedEntities.has(id)) {
+          // new entity -> insert
+          quad.insert({ x: t.x, y: t.y, entity: id })
+          trackedEntities.add(id)
+        } else {
+          // existing -> update position
+          quad.update(id, t.x, t.y)
+        }
+      }
+
+      // Remove entities that no longer exist
+      for (const id of Array.from(trackedEntities)) {
+        if (!existingThisFrame.has(id)) {
+          quad.remove(id)
+          trackedEntities.delete(id)
+        }
       }
 
       // pass logical canvas size for culling calculation

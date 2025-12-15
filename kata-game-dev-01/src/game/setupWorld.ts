@@ -1,8 +1,11 @@
 import { World, Entity } from '../engine/ECS'
 import { COMPONENTS } from '../engine/constants'
 
+export type QuadConfig = { boundary: { x: number; y: number; w: number; h: number }; capacity?: number; maxDepth?: number }
+
 // Initialize a world with a player entity and several NPCs.
-export const createWorld = (): { world: World; player: Entity } => {
+// Returns the world, player entity and a recommended quadtree configuration.
+export const createWorld = (): { world: World; player: Entity; quadConfig: QuadConfig } => {
   const world = new World()
 
   // Create player entity
@@ -19,5 +22,8 @@ export const createWorld = (): { world: World; player: Entity } => {
     world.addComponent(e, COMPONENTS.RENDERABLE, { color: '#E2A14E', size: 6 })
   }
 
-  return { world, player }
+  // Recommended QuadTree config (centered large bounds). Adjust these values as needed.
+  const quadConfig: QuadConfig = { boundary: { x: -5000, y: -5000, w: 10000, h: 10000 }, capacity: 8, maxDepth: 8 }
+
+  return { world, player, quadConfig }
 }
