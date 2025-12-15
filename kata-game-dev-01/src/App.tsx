@@ -1,30 +1,31 @@
 import React, { useEffect, useRef } from 'react'
 import { createWorld } from './game/setupWorld'
-import { MovementSystem } from './engine/systems/MovementSystem'
-import { RenderSystem } from './engine/systems/RenderSystem'
+import { createMovementSystem } from './engine/systems/MovementSystem'
+import { createRenderSystem } from './engine/systems/RenderSystem'
 import type { World } from './engine/ECS'
+import { COMPONENTS } from './engine/constants'
+import { useCanvas } from './hooks/useCanvas'
 
-export default function App() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+const App = () => {
+  const { canvasRef, ready } = useCanvas()
   const worldRef = useRef<World | null>(null)
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
+    if (!ready) return
+    const canvas = canvasRef.current!
 
     const { world, player } = createWorld()
     worldRef.current = world
 
-    const movement = new MovementSystem()
-    const render = new RenderSystem(canvas, player)
+    const { update: movementUpdate } = createMovementSystem()
+    const { update: renderUpdate } = createRenderSystem(canvas, player)
 
     // input state
     const keys = { up: false, down: false, left: false, right: false }
     const SPEED = 150 // units per second
 
-    function setVelocityFromInput() {
+    // Compute and set player velocity based on current input keys
+    const setVelocityFromInput = () => {
       const vx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0)
       const vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0)
       let nx = vx
@@ -35,10 +36,11 @@ export default function App() {
         ny = vy * inv
       }
       const vel = { vx: nx * SPEED, vy: ny * SPEED }
-      world.addComponent(player, 'Velocity', vel)
+      world.addComponent(player, COMPONENTS.VELOCITY, vel)
     }
 
-    function onKey(down: boolean, e: KeyboardEvent) {
+    // Handle key down/up updates to the input state
+    const onKey = (down: boolean, e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
       if (k === 'w' || k === 'arrowup') keys.up = down
       if (k === 's' || k === 'arrowdown') keys.down = down
@@ -47,8 +49,8 @@ export default function App() {
       setVelocityFromInput()
     }
 
-    function keydown(e: KeyboardEvent) { onKey(true, e) }
-    function keyup(e: KeyboardEvent) { onKey(false, e) }
+    const keydown = (e: KeyboardEvent) => onKey(true, e)
+    const keyup = (e: KeyboardEvent) => onKey(false, e)
 
     window.addEventListener('keydown', keydown)
     window.addEventListener('keyup', keyup)
@@ -56,11 +58,12 @@ export default function App() {
     let last = performance.now()
     let running = true
 
-    function frame(now: number) {
+    // Main game loop frame
+    const frame = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
-      movement.update(world, dt)
-      render.update(world, dt)
+      movementUpdate(world, dt)
+      renderUpdate(world, dt)
       if (running) requestAnimationFrame(frame)
     }
     requestAnimationFrame(frame)
@@ -70,9 +73,11 @@ export default function App() {
       window.removeEventListener('keydown', keydown)
       window.removeEventListener('keyup', keyup)
     }
-  }, [])
+  }, [ready])
 
   return (
     <canvas ref={canvasRef} />
   )
 }
+
+export default App

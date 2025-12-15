@@ -23,7 +23,7 @@ This repository is a minimal starter for building a TypeScript + React game usin
 
 - Lightweight ECS implementation (`src/engine/ECS.ts`) with component maps and simple queries.
 - Example components: `Transform`, `Velocity`, `Renderable`.
-- Systems: `MovementSystem` (updates position) and `RenderSystem` (renders simple circles to a canvas).
+- Systems: `createMovementSystem` (updates position) and `createRenderSystem` (renders simple circles to a canvas).
 - Game initialization in `src/game/setupWorld.ts` which creates a player entity and several NPCs.
 - Player input: WASD / Arrow keys to move the player (implemented in `src/App.tsx`).
 
@@ -57,4 +57,3 @@ This kata is intentionally small and educational. Feel free to open PRs or add f
 ## License & notes
 
 This starter is provided for learning and experimentation. No external assets are included.
-

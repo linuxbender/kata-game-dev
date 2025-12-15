@@ -1,7 +1,8 @@
-import { World } from '../ECS'
+import type { World } from '../ECS'
 
-export class MovementSystem {
-  update(world: World, dt: number) {
+// Movement system: updates Transform by Velocity each frame
+export const createMovementSystem = () => {
+  const update = (world: World, dt: number) => {
     const hits = world.query(['Transform', 'Velocity'])
     for (const h of hits) {
       const t = h.comps[0] as { x: number; y: number }
@@ -10,5 +11,6 @@ export class MovementSystem {
       t.y += v.vy * dt
     }
   }
-}
 
+  return { update }
+}

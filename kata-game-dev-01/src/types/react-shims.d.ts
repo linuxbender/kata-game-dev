@@ -1,6 +1,7 @@
 declare module 'react' {
   export function useEffect(effect: () => void | (() => void), deps?: any[]): void
   export function useRef<T>(initial?: T | null): { current: T | null }
+  export function useState<S>(initial: S | (() => S)): [S, (v: S | ((prev: S) => S)) => void]
   export const StrictMode: any
   const React: any
   export default React
