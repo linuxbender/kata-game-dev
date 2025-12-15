@@ -3,6 +3,7 @@ import { createWorld } from './game/setupWorld'
 import { createMovementSystem } from './engine/systems/MovementSystem'
 import { createRenderSystem } from './engine/systems/RenderSystem'
 import { createQuadTree } from './engine/spatial/QuadTree'
+import { createDebugOverlay } from './engine/systems/DebugOverlay'
 import type { World } from './engine/ECS'
 import { COMPONENTS } from './engine/constants'
 import { useCanvas } from './hooks/useCanvas'
@@ -43,6 +44,9 @@ const App = () => {
         }
       )
 
+      // Initialize debug overlay (toggle with Shift+D)
+      const debugOverlay = createDebugOverlay(canvas)
+
       // Initialize render system with smooth camera follow and spatial culling
       const { update: renderUpdate } = createRenderSystem(canvas, player, {
         dpr,
@@ -51,7 +55,7 @@ const App = () => {
           deadZoneRadius: 3,
           lookAheadFactor: 0.2
         }
-      }, quad)
+      }, quad, debugOverlay)
 
       // Track entities in quad tree for incremental updates
       const trackedEntities = new Set<number>()
@@ -113,6 +117,10 @@ const App = () => {
         if (k === 's' || k === 'arrowdown') keys.down = down
         if (k === 'a' || k === 'arrowleft') keys.left = down
         if (k === 'd' || k === 'arrowright') keys.right = down
+        // Toggle debug overlay on Shift+D (reliable cross-platform)
+        if (k === 'd' && down && e.shiftKey) {
+          debugOverlay.toggle()
+        }
         setVelocityFromInput()
       }
 
@@ -133,8 +141,8 @@ const App = () => {
         // Update movement
         movementUpdate(world, dt)
 
-        // Render frame
-        renderUpdate(world, dt, { width: canvas.width / dpr, height: canvas.height / dpr })
+        // Render frame (pass quad for debug metrics)
+        renderUpdate(world, dt, { width: canvas.width / dpr, height: canvas.height / dpr }, quad)
 
         if (running) requestAnimationFrame(frame)
       }

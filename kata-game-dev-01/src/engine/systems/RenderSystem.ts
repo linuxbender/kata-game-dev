@@ -1,11 +1,14 @@
 import type { World, Entity } from '../ECS'
 import { COMPONENTS } from '../constants'
 import { CameraConfig, DEFAULT_CAMERA_CONFIG, computeSmoothing, lerp, applyDeadZone } from './CameraConfig'
+import { createDebugOverlay } from './DebugOverlay'
 
 export type RenderOptions = {
   // Camera configuration for smooth follow behavior
   camera?: CameraConfig
   dpr?: number
+  // Enable debug overlay (draws QuadTree nodes and metrics)
+  debug?: boolean
 }
 
 export type SpatialIndex = {
@@ -18,7 +21,8 @@ export const createRenderSystem = (
   canvas: HTMLCanvasElement,
   playerEntity?: Entity,
   options?: RenderOptions,
-  spatialIndex?: SpatialIndex
+  spatialIndex?: SpatialIndex,
+  debugOverlay?: any
 ) => {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('2D context not available')
@@ -32,7 +36,7 @@ export const createRenderSystem = (
   let camXTarget = 0
   let camYTarget = 0
 
-  const update = (world: World, dt: number, canvasSize?: { width: number; height: number }) => {
+  const update = (world: World, dt: number, canvasSize?: { width: number; height: number }, spatialIndex?: any) => {
     // Update DPR and apply transform so drawing uses logical coordinates
     dpr = options?.dpr ?? dpr
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -76,8 +80,6 @@ export const createRenderSystem = (
     camY = lerp(camY, dzY, alpha)
 
     // Clear the canvas using logical dimensions (after applying DPR transform)
-    // canvas.width/height are physical pixels; after ctx.setTransform(dpr,0,0,dpr,0,0)
-    // we need to clear the logical drawing area (width/dpr, height/dpr).
     const logicalW = canvas.width / dpr
     const logicalH = canvas.height / dpr
     ctx.clearRect(0, 0, logicalW, logicalH)
@@ -133,6 +135,11 @@ export const createRenderSystem = (
         ctx.arc(screenX, screenY, rend.size, 0, Math.PI * 2)
         ctx.fill()
       }
+    }
+
+    // Draw debug overlay after entities if enabled (pass spatialIndex for metrics)
+    if (debugOverlay && debugOverlay.isEnabled()) {
+      debugOverlay.update(world, camX, camY, viewW, viewH, spatialIndex)
     }
   }
 
