@@ -34,7 +34,10 @@ export class World<C extends Record<string, any> = Record<string, any>> {
   getTime = (): number => this.elapsedTime
   updateTime = (dt: number): void => { this.elapsedTime += dt }
 
-  onComponentEvent = (cb: (e: ComponentEvent<C>) => void) => { this.listeners.add(cb); return () => this.listeners.delete(cb) }
+  onComponentEvent = (cb: (e: ComponentEvent<C>) => void) => {
+    this.listeners.add(cb);
+    return () => this.listeners.delete(cb)
+  }
 
   onComponentEventFor = <K extends keyof C | ComponentKey>(name: K, cb: (ev: KnownComponentEvent<C, K>) => void) => {
     const wrapper = (e: ComponentEvent<C>) => {
