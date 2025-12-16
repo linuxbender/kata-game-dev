@@ -6,7 +6,7 @@ import { createRenderSystem } from '@engine/systems/RenderSystem'
 import { createQuadTree } from '@engine/spatial/QuadTree'
 import { createDebugOverlay } from '@engine/systems/DebugOverlay'
 import type { TypedWorld } from '@engine/componentTypes'
-import { COMPONENTS } from '@engine/constants'
+import { COMPONENTS, EVENT_TYPES } from '@engine/constants'
 import { useCanvas } from './hooks/useCanvas'
 import { useQuadConfig } from './contexts/QuadConfigContext'
 import { createCanvasHudRenderer } from '@game/HUD'
@@ -95,19 +95,19 @@ const App = () => {
       // Subscribe to world component events to keep spatial index synchronized
       const unsubscribe = world.onComponentEvent((ev) => {
         if (ev.name !== COMPONENTS.TRANSFORM) return
-        if (ev.type === 'add') {
+        if (ev.type === EVENT_TYPES.ADD) {
           const id = ev.entity
           const pos = (ev.component as any)
           quad.insert({ x: pos.x, y: pos.y, entity: id })
           trackedEntities.add(id)
-        } else if (ev.type === 'update') {
+        } else if (ev.type === EVENT_TYPES.UPDATE) {
           const id = ev.entity
           const pos = world.getComponent(id, COMPONENTS.TRANSFORM)
           if (pos) {
             if (quad.has(id)) quad.update(id, pos.x, pos.y)
             else { quad.insert({ x: pos.x, y: pos.y, entity: id }); trackedEntities.add(id) }
           }
-        } else if (ev.type === 'remove') {
+        } else if (ev.type === EVENT_TYPES.REMOVE) {
           const id = ev.entity
           if (quad.has(id)) quad.remove(id)
           trackedEntities.delete(id)

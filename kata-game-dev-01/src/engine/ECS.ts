@@ -1,4 +1,5 @@
-import type { ComponentKey } from '@engine/constants'
+import { EVENT_TYPES } from '@engine/constants'
+import type { ComponentKey, EventType } from '@engine/constants'
 
 // Core ECS: World and basic types
 export type Entity = number
@@ -8,14 +9,14 @@ export type Entity = number
 // `name` is one of the world's known component keys. We also include
 // a string fallback to handle external/unknown component names at runtime.
 export type KnownComponentEvent<C extends Record<string, any>, K extends keyof C & ComponentKey> =
-  | { type: 'add' | 'update'; entity: Entity; name: K; component: C[K] }
-  | { type: 'remove'; entity: Entity; name: K }
+  | { type: EVENT_TYPES.ADD | EVENT_TYPES.UPDATE; entity: Entity; name: K; component: C[K] }
+  | { type: EVENT_TYPES.REMOVE; entity: Entity; name: K }
 
 export type ComponentEvent<C extends Record<string, any> = Record<string, any>> =
   // Union of all known-key events
   | { [K in keyof C & ComponentKey]: KnownComponentEvent<C, K> }[keyof C & ComponentKey]
   // Fallback for unknown/external names (keeps runtime flexibility)
-  | { type: 'add' | 'update' | 'remove'; entity: Entity; name: string; component?: unknown }
+  | { type: EventType; entity: Entity; name: string; component?: unknown }
 
 /**
  * World stores components in maps keyed by component name.
@@ -87,20 +88,13 @@ export class World<C extends Record<string, any> = Record<string, any>> {
     const existed = map.has(entity)
     map.set(entity, comp)
     // Emit a strongly-typed event for known keys (name is K here)
-    const ev: KnownComponentEvent<C, K> = { type: existed ? 'update' : 'add', entity, name, component: comp }
-    this.emit(ev)
-  }
-
-  // Remove a component from an entity and emit event.
-  removeComponent = <K extends keyof C & ComponentKey>(entity: Entity, name: K) => {
-    const map = this.components.get(name) as Map<Entity, C[K]> | undefined
-    if (!map) return
-    const existed = map.has(entity)
-    map.delete(entity)
-    if (existed) {
-      const ev: KnownComponentEvent<C, K> = { type: 'remove', entity, name }
-      this.emit(ev)
+    const ev: KnownComponentEvent<C, K> = {
+      type: existed ? EVENT_TYPES.UPDATE : EVENT_TYPES.ADD,
+      entity,
+      name,
+      component: comp
     }
+    this.emit(ev)
   }
 
   // Get a component of a specific entity if present.
@@ -115,8 +109,8 @@ export class World<C extends Record<string, any> = Record<string, any>> {
   markComponentUpdated = <K extends keyof C & ComponentKey>(entity: Entity, name: K) => {
     const comp = this.getComponent(entity, name)
     if (comp !== undefined) {
-      // Emit a typed KnownComponentEvent for this specific key K without unsafe casts
-      const ev: KnownComponentEvent<C, K> = { type: 'update', entity, name, component: comp }
+      // Emit a typed KnownComponentEvent for this specific key K
+      const ev: KnownComponentEvent<C, K> = { type: EVENT_TYPES.UPDATE, entity, name, component: comp }
       this.emit(ev)
     }
   }
@@ -130,17 +124,15 @@ export class World<C extends Record<string, any> = Record<string, any>> {
     const result: { entity: Entity; comps: { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } }[] = []
     for (const [entity] of first) {
       let ok = true
-      // collect unknowns and then cast to the correct tuple shape once all present
       const comps: unknown[] = []
       for (const n of names) {
         const map = this.components.get(n) as Map<Entity, unknown> | undefined
-        if (!map || !map.has(entity)) {
-          ok = false
-          break
-        }
+        if (!map || !map.has(entity)) { ok = false; break }
         comps.push(map.get(entity))
       }
-      if (ok) result.push({ entity, comps: comps as { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } })
+      if (ok) {
+        result.push({ entity, comps: comps as { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } })
+      }
     }
     return result
   }
