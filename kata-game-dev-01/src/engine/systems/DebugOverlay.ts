@@ -1,6 +1,6 @@
 // Debug overlay system: visualizes QuadTree structure and metrics
 
-import type { World } from '../ECS'
+import type { TypedWorld } from '@engine/componentTypes'
 
 export type DebugOverlayConfig = {
   enabled?: boolean
@@ -32,7 +32,7 @@ export const createDebugOverlay = (canvas: HTMLCanvasElement, config?: DebugOver
   }
 
   // Update debug display with live metrics
-  const update = (world: World, camX: number, camY: number, viewW: number, viewH: number, spatialIndex?: any) => {
+  const update = (world: TypedWorld, camX: number, camY: number, viewW: number, viewH: number, spatialIndex?: any) => {
     if (!cfg.enabled) return
 
     // Get metrics from spatial index (QuadTree) if available

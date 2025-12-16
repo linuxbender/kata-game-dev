@@ -1,8 +1,8 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App'
-import { QuadConfigProvider } from './contexts/QuadConfigContext'
-import './index.css'
+import App from '@/App'
+import { QuadConfigProvider } from '@/contexts/QuadConfigContext'
+import '@/index.css'
 
 // Mount React application and provide persisted quad config via context
 const mountApp = () => {

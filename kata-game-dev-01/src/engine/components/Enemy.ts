@@ -1,5 +1,5 @@
 // Enemy component type moved to engine to allow global component-type mapping
-import type { Entity } from '../ECS'
+import type { Entity } from '@engine/ECS'
 
 export type EnemyComponent = {
   targetEntity?: Entity  // Entity this enemy is targeting
@@ -17,4 +17,3 @@ export type EnemyComponent = {
   patrolAngle: number    // Current patrol angle (radians)
   patrolSpeed: number    // How fast to patrol (units/sec)
 }
-

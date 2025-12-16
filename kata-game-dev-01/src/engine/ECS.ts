@@ -1,4 +1,4 @@
-import type { ComponentKey } from './constants'
+import type { ComponentKey } from '@engine/constants'
 
 // Core ECS: World and basic types
 export type Entity = number

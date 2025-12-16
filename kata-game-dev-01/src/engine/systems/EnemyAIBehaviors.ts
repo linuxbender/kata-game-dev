@@ -1,10 +1,10 @@
 // Enemy behavior states and transitions
 
-import type { TypedWorld } from '../../engine/componentTypes'
-import { COMPONENTS } from '../constants'
-import type { EnemyComponent } from '../../engine/components/Enemy'
-import { calculateDirection, applyVelocity, stopMovement } from './EnemyAIUtilities'
-import type { Transform, Velocity } from '../components'
+import type { TypedWorld } from '@engine/componentTypes'
+import { COMPONENTS } from '@engine/constants'
+import type { EnemyComponent } from '@components/Enemy'
+import { calculateDirection, applyVelocity, stopMovement } from '@engine/systems/EnemyAIUtilities'
+import type { Transform, Velocity } from '@components/index'
 
 // Enemy behavior state enum
 export enum EnemyState {

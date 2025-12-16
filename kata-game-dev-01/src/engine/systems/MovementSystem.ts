@@ -1,4 +1,4 @@
-import type { TypedWorld } from '../../engine/componentTypes'
+import type { TypedWorld } from '@engine/componentTypes'
 
 // Movement system: updates Transform by Velocity each frame
 export const createMovementSystem = () => {

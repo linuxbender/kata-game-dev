@@ -1,9 +1,9 @@
 // Entity creation helpers - Demonstrate pattern for future components
 
-import type { TypedWorld } from '../engine/componentTypes'
-import type { Entity } from '../engine/ECS'
-import { COMPONENTS } from '../engine/constants'
-import { PLAYER_CONFIG, NPC_CONFIG, createTransform, createVelocity, createRenderable } from './ComponentPresets'
+import type { TypedWorld } from '@engine/componentTypes'
+import type { Entity } from '@engine/ECS'
+import { COMPONENTS } from '@engine/constants'
+import { PLAYER_CONFIG, NPC_CONFIG, createTransform, createVelocity, createRenderable } from '@game/ComponentPresets'
 
 // ==================== PLAYER FACTORY ====================
 

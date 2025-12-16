@@ -1,6 +1,6 @@
-import type { Entity } from '../ECS'
-import type { TypedWorld } from '../componentTypes'
-import { COMPONENTS } from '../constants'
+import type { Entity } from '@engine/ECS'
+import type { TypedWorld } from '@engine/componentTypes'
+import { COMPONENTS } from '@engine/constants'
 import { CameraConfig, DEFAULT_CAMERA_CONFIG, computeSmoothing, lerp, applyDeadZone } from './CameraConfig'
 import { createEnemyVisualizationSystem } from './EnemyVisualizationSystem'
 

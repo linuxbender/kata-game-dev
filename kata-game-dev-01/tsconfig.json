@@ -4,8 +4,8 @@
     "useDefineForClassFields": true,
     "lib": ["DOM", "ES2020"],
     "jsx": "react-jsx",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,7 +13,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "typeRoots": ["./node_modules/@types"]
+    "typeRoots": ["./node_modules/@types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@engine/*": ["src/engine/*"],
+      "@game/*": ["src/game/*"],
+      "@components/*": ["src/engine/components/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts", "src/types/**/*.d.ts"]
 }

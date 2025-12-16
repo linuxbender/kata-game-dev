@@ -1,9 +1,9 @@
 // Enemy AI system: controls enemy behavior, targeting, and attacks
 // Refactored with behavior pattern for maintainability and extensibility
 
-import type { TypedWorld } from '../../engine/componentTypes'
-import { COMPONENTS } from '../constants'
-import type { EnemyComponent } from '../../engine/components/Enemy'
+import type { TypedWorld } from '@engine/componentTypes'
+import { COMPONENTS } from '@engine/constants'
+import type { EnemyComponent } from '@components/Enemy'
 import {
   EnemyState,
   type EnemyBehavior,

@@ -1,7 +1,7 @@
 // Component presets and factories - Unified configuration system for all entity types
 // Follows Factory Pattern, DRY, and SOLID principles
 
-import type { Entity } from '../engine/ECS'
+import type { Entity } from '@engine/ECS'
 
 // ==================== PLAYER CONFIGURATION ====================
 
@@ -102,4 +102,3 @@ export const mergePreset = <T extends Record<string, unknown>>(
   ...preset.defaults,
   ...overrides
 })
-

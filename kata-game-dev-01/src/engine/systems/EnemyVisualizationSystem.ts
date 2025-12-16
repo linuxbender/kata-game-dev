@@ -1,9 +1,9 @@
 // Enemy detection range visualization system
 // Draws dashed circle showing enemy detection radius
 
-import type { TypedWorld } from '../componentTypes'
-import { COMPONENTS } from '../constants'
-import type { EnemyComponent } from '../../engine/components/Enemy'
+import type { TypedWorld } from '@engine/componentTypes'
+import { COMPONENTS } from '@engine/constants'
+import type { EnemyComponent } from '@components/Enemy'
 
 // Create visualization system for enemy detection ranges
 export const createEnemyVisualizationSystem = () => {
