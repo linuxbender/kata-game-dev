@@ -12,7 +12,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 export const createCanvasHudRenderer = (getHealth: () => Health | null): HudRenderer => {
     let animatedPct = 1
     let animatedValue = 0
-    return (ctx, world, camX, camY, viewW, viewH, dpr) => {
+    return (ctx) => {
         const health = getHealth()
         if (!health) return
         const targetPct = Math.max(0, Math.min(1, health.current / health.max))

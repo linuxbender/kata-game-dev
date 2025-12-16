@@ -15,8 +15,6 @@ export const SENTINELS = {
   UNDEFINED_STRING: 'undefined'
 } as const
 
-export type Sentinel = typeof SENTINELS[keyof typeof SENTINELS]
-
 // Event types: string enum for consistency with COMPONENTS pattern
 export enum EVENT_TYPES {
   ADD = 'add',

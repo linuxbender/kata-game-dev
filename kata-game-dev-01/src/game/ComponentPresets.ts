@@ -1,7 +1,3 @@
-// Component presets and factories - Unified configuration system for all entity types
-// Follows Factory Pattern, DRY, and SOLID principles
-
-import type { Entity } from '@engine/ECS'
 import type { Point, Velocity } from '@components'
 
 // ==================== PLAYER CONFIGURATION ====================
