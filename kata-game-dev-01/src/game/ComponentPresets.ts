@@ -2,6 +2,7 @@
 // Follows Factory Pattern, DRY, and SOLID principles
 
 import type { Entity } from '@engine/ECS'
+import type { Point, Velocity } from '@components'
 
 // ==================== PLAYER CONFIGURATION ====================
 
@@ -39,12 +40,9 @@ export const NPC_CONFIG: NPCConfig = {
 
 // ==================== TRANSFORM COMPONENT FACTORY ====================
 
-export type TransformData = { x: number; y: number }
+export type TransformData = Point
 
-export const createTransform = (x: number, y: number): TransformData => ({
-  x,
-  y
-})
+export const createTransform = (x: number, y: number): TransformData => ({ x, y })
 
 export const createRandomTransform = (maxX: number, maxY: number): TransformData => ({
   x: (Math.random() - 0.5) * maxX,
@@ -53,12 +51,9 @@ export const createRandomTransform = (maxX: number, maxY: number): TransformData
 
 // ==================== VELOCITY COMPONENT FACTORY ====================
 
-export type VelocityData = { vx: number; vy: number }
+export type VelocityData = Velocity
 
-export const createVelocity = (vx: number = 0, vy: number = 0): VelocityData => ({
-  vx,
-  vy
-})
+export const createVelocity = (vx: number = 0, vy: number = 0): VelocityData => ({ vx, vy })
 
 export const createRandomVelocity = (maxSpeed: number): VelocityData => ({
   vx: (Math.random() - 0.5) * maxSpeed,

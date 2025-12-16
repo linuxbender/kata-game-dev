@@ -6,8 +6,8 @@ export const createMovementSystem = () => {
     const hits = world.query('Transform', 'Velocity')
     for (const h of hits) {
       const entity = h.entity
-      const t = h.comps[0] as { x: number; y: number }
-      const v = h.comps[1] as { vx: number; vy: number }
+      const t = h.comps[0]
+      const v = h.comps[1]
       t.x += v.vx * dt
       t.y += v.vy * dt
       // Notify world that Transform was updated in-place

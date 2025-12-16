@@ -66,7 +66,7 @@ export const createRenderSystem = (
     } else {
       const transforms = world.query(COMPONENTS.TRANSFORM)
       if (transforms.length) {
-        const t0 = transforms[0].comps[0] as { x: number; y: number }
+        const t0 = transforms[0].comps[0]
         camXTarget = t0.x
         camYTarget = t0.y
       }
@@ -121,12 +121,12 @@ export const createRenderSystem = (
       // Fallback: query all renderables from world (useful for small scenes)
       const renderables = world.query(COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE)
       for (const r of renderables) {
-        const t = r.comps[0] as { x: number; y: number }
-        const rend = r.comps[1] as { color: string; size: number }
+        const t = r.comps[0]
+        const rend = r.comps[1]
 
-        // Simple AABB culling using entity size
-        const s = rend.size
-        if (t.x + s < minX || t.x - s > maxX || t.y + s < minY || t.y - s > maxY) continue
+         // Simple AABB culling using entity size
+         const s = rend.size
+         if (t.x + s < minX || t.x - s > maxX || t.y + s < minY || t.y - s > maxY) continue
 
         // Convert world position to screen position (logical pixels)
         const screenX = Math.round((t.x - camX) + viewW / 2)

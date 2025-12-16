@@ -67,7 +67,7 @@ const App = () => {
       const initial = world.query(COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE)
       for (const e of initial) {
         const id = e.entity
-        const t = e.comps[0] as { x: number; y: number }
+        const t = e.comps[0]
         quad.insert({ x: t.x, y: t.y, entity: id })
         trackedEntities.add(id)
       }

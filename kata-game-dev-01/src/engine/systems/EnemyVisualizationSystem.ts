@@ -4,6 +4,7 @@
 import type { TypedWorld } from '@engine/componentTypes'
 import { COMPONENTS } from '@engine/constants'
 import type { EnemyComponent } from '@components/Enemy'
+import type { Point, Transform } from '@components/Transform'
 
 // Create visualization system for enemy detection ranges
 export const createEnemyVisualizationSystem = () => {
@@ -14,17 +15,17 @@ export const createEnemyVisualizationSystem = () => {
     camY: number,
     viewW: number,
     viewH: number,
-    dpr: number
+    _dpr: number
   ) => {
     // Query all enemies with transform
     const enemies = world.query(COMPONENTS.ENEMY, COMPONENTS.TRANSFORM)
 
-    for (const e of enemies) {
-      const enemy = e.comps[0] as EnemyComponent
-      const transform = e.comps[1] as { x: number; y: number }
+    for (const { comps } of enemies) {
+      // Destructure named components for readability: [Enemy, Transform]
+      const [enemy, transform]: [EnemyComponent, Transform] = comps
 
       // Draw detection range circle (dashed)
-      drawDetectionRange(ctx, transform.x, transform.y, enemy.detectionRange, camX, camY, viewW, viewH, dpr)
+      drawDetectionRange(ctx, transform.x, transform.y, enemy.detectionRange, camX, camY, viewW, viewH, _dpr)
     }
   }
 
@@ -41,7 +42,7 @@ const drawDetectionRange = (
   camY: number,
   viewW: number,
   viewH: number,
-  dpr: number
+  _dpr: number
 ) => {
   // Convert world position to screen position
   const screenX = (worldX - camX) + viewW / 2

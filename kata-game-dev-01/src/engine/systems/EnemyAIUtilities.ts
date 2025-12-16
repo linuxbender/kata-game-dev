@@ -1,5 +1,7 @@
 // Enemy AI behavior utilities - pure utility functions for AI logic
 
+import type { Velocity } from '@components/Velocity'
+
 // Calculate squared distance between two points (faster, avoids sqrt for comparisons)
 export const calculateDistanceSquared = (x1: number, y1: number, x2: number, y2: number): number => {
   const dx = x2 - x1
@@ -35,7 +37,7 @@ export const calculateDirection = (
 
 // Apply velocity based on direction and speed
 export const applyVelocity = (
-  velocity: { vx: number; vy: number },
+  velocity: Velocity,
   nx: number,
   ny: number,
   speed: number
@@ -45,8 +47,7 @@ export const applyVelocity = (
 }
 
 // Stop entity (set velocity to zero)
-export const stopMovement = (velocity: { vx: number; vy: number }): void => {
+export const stopMovement = (velocity: Velocity): void => {
   velocity.vx = 0
   velocity.vy = 0
 }
-

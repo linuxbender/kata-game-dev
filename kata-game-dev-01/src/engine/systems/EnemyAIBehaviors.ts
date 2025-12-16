@@ -36,7 +36,7 @@ export const createChaseBehavior = (): EnemyBehavior => ({
     const targetTransform = world.getComponent(
       targetId,
       COMPONENTS.TRANSFORM
-    ) as Transform | undefined
+    )
 
     if (!targetTransform) return EnemyState.IDLE
 
@@ -75,7 +75,7 @@ export const createAttackBehavior = (): EnemyBehavior => ({
     const targetTransform = world.getComponent(
       targetId,
       COMPONENTS.TRANSFORM
-    ) as Transform | undefined
+    )
 
     if (!targetTransform) return EnemyState.IDLE
 
@@ -158,7 +158,7 @@ export const createIdleBehavior = (): EnemyBehavior => ({
     const targetTransform = world.getComponent(
       targetId,
       COMPONENTS.TRANSFORM
-    ) as Transform | undefined
+    )
 
     if (!targetTransform) return null
 

@@ -1,9 +1,6 @@
-// Simple generic QuadTree implementation for spatial partitioning.
-// Arrow-style factory returning an object with insert/clear/query/update/remove methods.
-// Adds merge-threshold, batch rebalancing and auto-tuning based on runtime metrics.
-
+import type { Point } from '@components/Transform'
 export type Rect = { x: number; y: number; w: number; h: number }
-export type PointItem = { x: number; y: number; entity: number }
+export type PointItem = Point & { entity: number }
 
 export type QuadOptions = {
   mergeThreshold?: number // fraction [0..1] average occupancy per child under which merging is allowed (default 0.25)
@@ -27,7 +24,7 @@ export type QuadMetrics = {
   avgChildOccupancy?: number
 }
 
-export const createQuadTree = <T extends { x: number; y: number; entity: number } = PointItem>(
+export const createQuadTree = <T extends Point & { entity: number } = PointItem>(
   boundary: Rect,
   capacity = 8,
   maxDepth = 8,
@@ -61,7 +58,7 @@ export const createQuadTree = <T extends { x: number; y: number; entity: number 
   let splits = 0
   let merges = 0
 
-  const contains = (r: Rect, p: { x: number; y: number }) => {
+  const contains = (r: Rect, p: Point) => {
     return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h
   }
 

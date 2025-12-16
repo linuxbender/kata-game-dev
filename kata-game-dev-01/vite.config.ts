@@ -9,7 +9,8 @@ export default defineConfig({
       '@': '/src',
       '@engine': '/src/engine',
       '@game': '/src/game',
-      '@components': '/src/engine/components'
+      '@components': '/src/engine/components',
+      '@components$': '/src/engine/components/index.ts'
     }
   }
 })

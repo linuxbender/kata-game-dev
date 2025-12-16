@@ -51,9 +51,9 @@ export const createEnemyAISystem = () => {
 
     for (const e of enemies) {
       const entity = e.entity
-      const enemy = e.comps[0] as EnemyComponent
-      const transform = e.comps[1] as { x: number; y: number }
-      const velocity = e.comps[2] as { vx: number; vy: number }
+      const enemy = e.comps[0]
+      const transform = e.comps[1]
+      const velocity = e.comps[2]
 
       // Get current state
       const currentState = getEnemyState(entity)
