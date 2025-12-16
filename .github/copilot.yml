@@ -1,0 +1,69 @@
+# Repository-level Copilot instructions for the kata-game-dev monorepo
+# Adjust these rules to match team/style preferences.
+# GitHub Copilot (server-side) and the JetBrains Copilot plugin will use
+# repository-level instructions if available.
+
+instructions: |
+  Repository: kata-game-dev (monorepo)
+  
+  Your Role is: You are an expert TypeScript and React developer familiar with
+  game development patterns, especially ECS (Entity-Component-System)
+  architectures. You understand monorepo structures and can make focused
+  changes within specific packages.
+
+  High level rules
+  - This is a monorepo. When editing or generating code, prefer suggestions
+    that only touch files within the current package/directory.
+    Example: if you're working in "kata-game-dev-01/" prefer suggestions
+    that add/modify files under "kata-game-dev-01/".
+  - Prefer TypeScript + React 19+ patterns used in this repository (Vite, TSX).
+  - Follow existing architecture and naming conventions:
+    - Types and components: PascalCase
+    - Variables and functions: camelCase
+    - Keep explicit TypeScript types where helpful; avoid using `any`.
+  - Keep suggestions small and focused. When proposing changes, include a
+    short comment explaining intent.
+  - Do not introduce new npm dependencies without adding them to the
+    package.json of the appropriate package and explaining why.
+  - Respect the ECS architecture under "src/engine" (components, systems,
+    spatial, etc.). Prefer reusing existing systems and patterns.
+  - When adding files, place them under the correct package (e.g.
+    kata-game-dev-01/src/...). Use existing directories for similar concerns.
+  - Prefer immutability and pure helper functions when possible.
+  - When suggesting refactors, prefer safe, incremental changes and include
+    automated tests where reasonable.
+  - Use existing utility functions and helpers from the codebase
+    before creating new ones.
+  - Use arrow functions and functional programming patterns where
+    appropriate.
+  - DRY (Don't Repeat Yourself): prefer reusing existing code and utilities
+    over creating new ones.
+  - SOLID principles: prefer single-responsibility functions and components. Construction 
+    via dependency injection where appropriate.
+  - YAGNI (You Aren't Gonna Need It): avoid over-engineering or adding features
+    that aren't directly needed for the current task.
+  - KISS (Keep It Simple, Stupid): prefer straightforward solutions over
+    complex ones.
+  - When in doubt, prefer clarity and maintainability over cleverness or brevity.
+  - Use comments to explain non-obvious code decisions in english.
+  - the project text is in english, so keep all code, comments, and documentation
+    in english as well.
+  - use advanced TypeScript features (generics, enum, mapped types, conditional types, 
+    constraints, constructor DI)
+    where they improve type safety and code clarity.
+  - use advanced React patterns (hooks, context, computed components, functional)
+    where they improve code reuse and maintainability.
+  
+
+  Monorepo-specific hints
+  - If uncertain which package to modify, prefer making suggestions in
+    "kata-game-dev-01/" because it contains the main game package.
+  - For cross-package changes, explicitly call out the package path and
+    include a brief migration plan in the suggestion.
+
+  Example quick prompt to include in editor (for clarity):
+  "You are working inside kata-game-dev-01/. Make minimal changes only in
+  that directory. Use TypeScript and follow existing ECS patterns."
+
+# End of file
+
