@@ -2,9 +2,9 @@
 
 import type { TypedWorld } from '@engine/componentTypes'
 import { COMPONENTS } from '@engine/constants'
-import type { EnemyComponent } from '@components/Enemy'
+import type { EnemyComponent } from '@components'
 import { calculateDirection, applyVelocity, stopMovement } from '@engine/systems/EnemyAIUtilities'
-import type { Transform, Velocity } from '@components/index'
+import type { Transform, Velocity } from '@components'
 
 // Enemy behavior state enum
 export enum EnemyState {

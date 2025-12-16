@@ -1,4 +1,4 @@
-import type { Point } from '@components/Transform'
+import type { Point } from '@components'
 export type Rect = { x: number; y: number; w: number; h: number }
 export type PointItem = Point & { entity: number }
 

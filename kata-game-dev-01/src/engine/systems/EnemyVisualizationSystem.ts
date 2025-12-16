@@ -3,8 +3,7 @@
 
 import type { TypedWorld } from '@engine/componentTypes'
 import { COMPONENTS } from '@engine/constants'
-import type { EnemyComponent } from '@components/Enemy'
-import type { Point, Transform } from '@components/Transform'
+import type { EnemyComponent, Point, Transform } from '@components'
 
 // Create visualization system for enemy detection ranges
 export const createEnemyVisualizationSystem = () => {

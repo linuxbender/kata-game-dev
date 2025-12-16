@@ -1,7 +1,7 @@
 import { World, Entity } from '@engine/ECS'
 import { COMPONENTS } from '@engine/constants'
 import { createEnemyComponent, ENEMY_SPAWNS } from '@game/EnemyPresets'
-import { Transform, Velocity, Renderable } from '@components/index'
+import { Transform, Velocity, Renderable } from '@components'
 import type { GlobalComponents, TypedWorld } from '@engine/componentTypes'
 
 export type QuadConfig = { boundary: { x: number; y: number; w: number; h: number }; capacity?: number; maxDepth?: number; mergeThreshold?: number; rebalanceInterval?: number }

@@ -1,6 +1,6 @@
 // Enemy AI behavior utilities - pure utility functions for AI logic
 
-import type { Velocity } from '@components/Velocity'
+import type { Velocity } from '@components'
 
 // Calculate squared distance between two points (faster, avoids sqrt for comparisons)
 export const calculateDistanceSquared = (x1: number, y1: number, x2: number, y2: number): number => {

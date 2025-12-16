@@ -3,7 +3,7 @@
 
 import type { TypedWorld } from '@engine/componentTypes'
 import { COMPONENTS } from '@engine/constants'
-import type { EnemyComponent } from '@components/Enemy'
+import type { EnemyComponent } from '@components'
 import {
   EnemyState,
   type EnemyBehavior,
