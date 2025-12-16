@@ -5,3 +5,5 @@ export const COMPONENTS = {
     RENDERABLE: 'Renderable',
     ENEMY: 'Enemy'
 } as const
+
+export type ComponentKey = typeof COMPONENTS[keyof typeof COMPONENTS]

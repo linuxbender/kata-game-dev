@@ -1,12 +1,13 @@
 // Entity creation helpers - Demonstrate pattern for future components
 
-import type { World, Entity } from '../engine/ECS'
+import type { TypedWorld } from '../engine/componentTypes'
+import type { Entity } from '../engine/ECS'
 import { COMPONENTS } from '../engine/constants'
 import { PLAYER_CONFIG, NPC_CONFIG, createTransform, createVelocity, createRenderable } from './ComponentPresets'
 
 // ==================== PLAYER FACTORY ====================
 
-export const createPlayerEntity = (world: World): Entity => {
+export const createPlayerEntity = (world: TypedWorld): Entity => {
   const player = world.createEntity()
 
   world.addComponent(player, COMPONENTS.TRANSFORM, createTransform(
@@ -26,7 +27,7 @@ export const createPlayerEntity = (world: World): Entity => {
 
 // ==================== NPC FACTORY ====================
 
-export const createNPCEntities = (world: World, count: number): Entity[] => {
+export const createNPCEntities = (world: TypedWorld, count: number): Entity[] => {
   const npcs: Entity[] = []
 
   for (let i = 0; i < count; i++) {
@@ -87,4 +88,3 @@ export const createNPCEntities = (world: World, count: number): Entity[] => {
 
 That's it! No code duplication, fully maintainable.
 */
-

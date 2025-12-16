@@ -1,15 +1,15 @@
 // Enemy detection range visualization system
 // Draws dashed circle showing enemy detection radius
 
-import type { World, Entity } from '../ECS'
+import type { TypedWorld } from '../../engine/componentTypes'
 import { COMPONENTS } from '../constants'
-import type { EnemyComponent } from '../../game/setupWorld'
+import type { EnemyComponent } from '../../engine/components/Enemy'
 
 // Create visualization system for enemy detection ranges
 export const createEnemyVisualizationSystem = () => {
   const update = (
     ctx: CanvasRenderingContext2D,
-    world: World,
+    world: TypedWorld,
     camX: number,
     camY: number,
     viewW: number,
@@ -76,4 +76,3 @@ const drawDetectionRange = (
   ctx.fill()
   ctx.restore()
 }
-

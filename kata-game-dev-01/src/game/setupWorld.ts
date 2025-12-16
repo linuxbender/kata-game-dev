@@ -1,31 +1,15 @@
 import { World, Entity } from '../engine/ECS'
 import { COMPONENTS } from '../engine/constants'
 import { createEnemyComponent, ENEMY_SPAWNS } from './EnemyPresets'
+import { Transform, Velocity, Renderable } from '../engine/components'
+import type { GlobalComponents, TypedWorld } from '../engine/componentTypes'
 
 export type QuadConfig = { boundary: { x: number; y: number; w: number; h: number }; capacity?: number; maxDepth?: number; mergeThreshold?: number; rebalanceInterval?: number }
 
-// Enemy component for AI behavior
-export type EnemyComponent = {
-  targetEntity?: Entity  // Entity this enemy is targeting
-  attackRange: number    // How close to attack
-  attackDamage: number   // Damage per hit
-  attackCooldown: number // Time between attacks
-  lastAttackTime: number // When last attack happened
-  speed: number          // Movement speed
-  detectionRange: number // How far to chase the target (200 units)
-  spawnX: number         // Original spawn position X
-  spawnY: number         // Original spawn position Y
-  isReturning: boolean   // Currently returning to spawn?
-  // Idle patrol behavior
-  patrolRadius: number   // How far to wander from spawn (50 units)
-  patrolAngle: number    // Current patrol angle (radians)
-  patrolSpeed: number    // How fast to patrol (units/sec)
-}
-
 // Initialize a world with a player entity, NPCs, and an enemy AI.
 // Returns the world, player entity and a recommended quadtree configuration.
-export const createWorld = (): { world: World; player: Entity; quadConfig: QuadConfig } => {
-  const world = new World()
+export const createWorld = (): { world: TypedWorld; player: Entity; quadConfig: QuadConfig } => {
+  const world = new World<GlobalComponents>()
 
   // Create player entity
   const player = world.createEntity()

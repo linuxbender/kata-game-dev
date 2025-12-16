@@ -1,9 +1,9 @@
 // Enemy AI system: controls enemy behavior, targeting, and attacks
 // Refactored with behavior pattern for maintainability and extensibility
 
-import type { World } from '../ECS'
+import type { TypedWorld } from '../../engine/componentTypes'
 import { COMPONENTS } from '../constants'
-import type { EnemyComponent } from '../../game/setupWorld'
+import type { EnemyComponent } from '../../engine/components/Enemy'
 import {
   EnemyState,
   type EnemyBehavior,
@@ -45,7 +45,7 @@ export const createEnemyAISystem = () => {
   }
 
   // Main update function
-  const update = (world: World) => {
+  const update = (world: TypedWorld) => {
     // Query all enemies
     const enemies = world.query([COMPONENTS.ENEMY, COMPONENTS.TRANSFORM, COMPONENTS.VELOCITY])
 

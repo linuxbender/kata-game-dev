@@ -2,7 +2,7 @@
 // Follows DRY, SOLID, and Factory Pattern principles
 
 import type { Entity } from '../engine/ECS'
-import type { EnemyComponent } from './setupWorld'
+import type { EnemyComponent } from '../engine/components/Enemy'
 
 // Define reusable enemy archetypes/presets
 // Excludes spawn position (x,y) which is defined per instance in ENEMY_SPAWNS

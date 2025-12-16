@@ -1,9 +1,10 @@
 // Enemy behavior states and transitions
 
-import type { World } from '../ECS'
+import type { TypedWorld } from '../../engine/componentTypes'
 import { COMPONENTS } from '../constants'
-import type { EnemyComponent } from '../../game/setupWorld'
+import type { EnemyComponent } from '../../engine/components/Enemy'
 import { calculateDirection, applyVelocity, stopMovement } from './EnemyAIUtilities'
+import type { Transform, Velocity } from '../components'
 
 // Enemy behavior state enum
 export enum EnemyState {
@@ -17,11 +18,11 @@ export enum EnemyState {
 export interface EnemyBehavior {
   enter?: (enemy: EnemyComponent) => void
   execute: (
-    world: World,
+    world: TypedWorld,
     entity: number,
     enemy: EnemyComponent,
-    transform: { x: number; y: number },
-    velocity: { vx: number; vy: number }
+    transform: Transform,
+    velocity: Velocity
   ) => EnemyState | null
   exit?: (enemy: EnemyComponent) => void
 }
@@ -29,12 +30,13 @@ export interface EnemyBehavior {
 // Chase behavior - move towards target
 export const createChaseBehavior = (): EnemyBehavior => ({
   execute: (world, entity, enemy, transform, velocity) => {
-    if (!enemy.targetEntity) return EnemyState.IDLE
+    const targetId = enemy.targetEntity
+    if (targetId === undefined) return EnemyState.IDLE
 
-    const targetTransform = world.getComponent<{ x: number; y: number }>(
-      enemy.targetEntity,
+    const targetTransform = world.getComponent(
+      targetId,
       COMPONENTS.TRANSFORM
-    )
+    ) as Transform | undefined
 
     if (!targetTransform) return EnemyState.IDLE
 
@@ -67,12 +69,13 @@ export const createChaseBehavior = (): EnemyBehavior => ({
 // Attack behavior - attack target if in range and cooldown passed
 export const createAttackBehavior = (): EnemyBehavior => ({
   execute: (world, entity, enemy, transform, velocity) => {
-    if (!enemy.targetEntity) return EnemyState.IDLE
+    const targetId = enemy.targetEntity
+    if (targetId === undefined) return EnemyState.IDLE
 
-    const targetTransform = world.getComponent<{ x: number; y: number }>(
-      enemy.targetEntity,
+    const targetTransform = world.getComponent(
+      targetId,
       COMPONENTS.TRANSFORM
-    )
+    ) as Transform | undefined
 
     if (!targetTransform) return EnemyState.IDLE
 
@@ -149,12 +152,13 @@ export const createReturnBehavior = (): EnemyBehavior => ({
 // Idle behavior - patrol around spawn (check if target re-enters detection range)
 export const createIdleBehavior = (): EnemyBehavior => ({
   execute: (world, entity, enemy, transform, velocity) => {
-    if (!enemy.targetEntity) return null
+    const targetId = enemy.targetEntity
+    if (targetId === undefined) return null
 
-    const targetTransform = world.getComponent<{ x: number; y: number }>(
-      enemy.targetEntity,
+    const targetTransform = world.getComponent(
+      targetId,
       COMPONENTS.TRANSFORM
-    )
+    ) as Transform | undefined
 
     if (!targetTransform) return null
 
