@@ -1,7 +1,8 @@
 import { World, Entity } from '@engine/ECS'
 import { COMPONENTS } from '@engine/constants'
 import { createEnemyComponent, ENEMY_SPAWNS } from '@game/EnemyPresets'
-import { Transform, Velocity, Renderable } from '@components'
+import { Transform, Velocity, Renderable, createHealth } from '@components'
+import type { Health } from '@components'
 import type { GlobalComponents, TypedWorld } from '@engine/componentTypes'
 
 export type QuadConfig = { boundary: { x: number; y: number; w: number; h: number }; capacity?: number; maxDepth?: number; mergeThreshold?: number; rebalanceInterval?: number }
@@ -16,6 +17,9 @@ export const createWorld = (): { world: TypedWorld; player: Entity; quadConfig: 
   world.addComponent(player, COMPONENTS.TRANSFORM, { x: 0, y: 0 })
   world.addComponent(player, COMPONENTS.VELOCITY, { vx: 0, vy: 0 })
   world.addComponent(player, COMPONENTS.RENDERABLE, { color: '#4EE21E', size: 12 })
+  // Give the player a Health component
+  const hp: Health = createHealth(100)
+  world.addComponent(player, COMPONENTS.HEALTH, hp)
 
   // Populate world with enemies using presets
   for (const spawn of ENEMY_SPAWNS) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createWorld } from '@game/setupWorld'
 import { createMovementSystem } from '@engine/systems/MovementSystem'
 import { createEnemyAISystem } from '@engine/systems/EnemyAISystem'
@@ -10,11 +10,14 @@ import type { TypedWorld } from '@engine/componentTypes'
 import { COMPONENTS } from '@engine/constants'
 import { useCanvas } from './hooks/useCanvas'
 import { useQuadConfig } from './contexts/QuadConfigContext'
+import type { Health } from '@components'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
   const { canvasRef, ready, dpr } = useCanvas()
   const worldRef = useRef<TypedWorld | null>(null)
+  const playerRef = useRef<number | null>(null)
+  const [playerHealth, setPlayerHealth] = useState<Health | null>(null)
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
@@ -28,6 +31,11 @@ const App = () => {
     try {
       const { world, player, quadConfig } = createWorld()
       worldRef.current = world
+      playerRef.current = player
+
+      // initialize player health from world if available
+      const initialHealth = world.getComponent(player, COMPONENTS.HEALTH)
+      if (initialHealth) setPlayerHealth(initialHealth)
 
       const { update: movementUpdate } = createMovementSystem()
       const { update: enemyAIUpdate } = createEnemyAISystem()
@@ -71,6 +79,13 @@ const App = () => {
         quad.insert({ x: t.x, y: t.y, entity: id })
         trackedEntities.add(id)
       }
+
+      // Subscribe to Health events for player and update React state
+      const unsubHealth = world.onComponentEventFor(COMPONENTS.HEALTH, (ev) => {
+        if (ev.entity !== player) return
+        if (ev.type === 'add' || ev.type === 'update') setPlayerHealth(ev.component)
+        else setPlayerHealth(null)
+      })
 
       // Subscribe to world component events to keep spatial index synchronized
       const unsubscribe = world.onComponentEvent((ev) => {
@@ -164,6 +179,7 @@ const App = () => {
         window.removeEventListener('keydown', keydown)
         window.removeEventListener('keyup', keyup)
         unsubscribe()
+        unsubHealth()
       }
     } catch (error) {
       console.error('App initialization error:', error)
@@ -171,7 +187,23 @@ const App = () => {
   }, [ready, dpr])
 
   return (
-    <canvas ref={canvasRef} />
+    <div style={{ position: 'relative' }}>
+      <canvas ref={canvasRef} />
+      {/* Health HUD */}
+      <div style={{ position: 'absolute', left: 12, top: 12 }}>
+        {playerHealth ? (
+          <div style={{ minWidth: 140, padding: 6, background: 'rgba(0,0,0,0.4)', color: '#fff', borderRadius: 6 }}>
+            <div style={{ fontSize: 12, marginBottom: 6 }}>HP</div>
+            <div style={{ width: 120, height: 12, background: 'rgba(255,255,255,0.12)', borderRadius: 6 }}>
+              <div style={{ height: '100%', width: `${(playerHealth.current / playerHealth.max) * 100}%`, background: '#e74c3c', borderRadius: 6 }} />
+            </div>
+            <div style={{ fontSize: 12, marginTop: 6 }}>{playerHealth.current} / {playerHealth.max}</div>
+          </div>
+        ) : (
+          <div style={{ minWidth: 120, padding: 6, background: 'rgba(0,0,0,0.4)', color: '#fff', borderRadius: 6 }}>No Health</div>
+        )}
+      </div>
+    </div>
   )
 }
 

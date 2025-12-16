@@ -3,7 +3,8 @@ export const COMPONENTS = {
     TRANSFORM: 'Transform',
     VELOCITY: 'Velocity',
     RENDERABLE: 'Renderable',
-    ENEMY: 'Enemy'
+    ENEMY: 'Enemy',
+    HEALTH: 'Health'
 } as const
 
 export type ComponentKey = typeof COMPONENTS[keyof typeof COMPONENTS]

@@ -1,7 +1,8 @@
-import type { Transform, Velocity, Renderable } from '@components'
-import type { EnemyComponent } from '@components'
+import type { Transform, Velocity, Renderable, EnemyComponent } from '@components'
 
-export type GlobalComponents = {
+// GlobalComponents is declared as an interface so it can be augmented via
+// declaration merging in other files or packages (useful for plugins).
+export interface GlobalComponents {
   Transform: Transform
   Velocity: Velocity
   Renderable: Renderable
