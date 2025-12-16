@@ -63,6 +63,11 @@ instructions: |
   - clean code is more important than clever code.
     prefer readability and maintainability over brevity or performance
     optimizations unless absolutely necessary.
+  - current package versions:
+    - TypeScript: 5.9+
+    - React: 19.2+
+    - Vite: 7.3+
+    - Node: 25.2+
   
   Monorepo-specific hints
   - If uncertain which package to modify, prefer making suggestions in
