@@ -3,6 +3,7 @@ import { createWorld } from '@game/setupWorld'
 import { createMovementSystem } from '@engine/systems/MovementSystem'
 import { createEnemyAISystem } from '@engine/systems/EnemyAISystem'
 import { createRenderSystem } from '@engine/systems/RenderSystem'
+import { createInputSystem, INPUT_ACTIONS } from '@engine/systems/InputSystem'
 import { createQuadTree } from '@engine/spatial/QuadTree'
 import { createDebugOverlay } from '@engine/systems/DebugOverlay'
 import type { TypedWorld } from '@engine/componentTypes'
@@ -51,6 +52,12 @@ const App = () => {
 
       const { update: movementUpdate } = createMovementSystem()
       const { update: enemyAIUpdate } = createEnemyAISystem()
+
+      // Initialize input system with configurable settings
+      const inputSystem = createInputSystem({
+        movementSpeed: 150,
+        enableDiagonalNormalization: true
+      })
 
       // Initialize quad tree with persisted config merged with defaults
       const quad = createQuadTree(
@@ -114,44 +121,11 @@ const App = () => {
         }
       })
 
-      // Input handling
-      const keys = { up: false, down: false, left: false, right: false }
-      const SPEED = 150 // units per second
+      // Attach input system listeners
+      inputSystem.attach()
 
-      // Update player velocity based on current input state
-      const setVelocityFromInput = () => {
-        const vx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0)
-        const vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0)
-        let nx = vx
-        let ny = vy
-        if (vx !== 0 && vy !== 0) {
-          const inv = 1 / Math.sqrt(2)
-          nx = vx * inv
-          ny = vy * inv
-        }
-        const vel = { vx: nx * SPEED, vy: ny * SPEED }
-        world.addComponent(player, COMPONENTS.VELOCITY, vel)
-      }
-
-      // Handle keyboard input
-      const onKey = (down: boolean, e: KeyboardEvent) => {
-        const k = e.key.toLowerCase()
-        if (k === 'w' || k === 'arrowup') keys.up = down
-        if (k === 's' || k === 'arrowdown') keys.down = down
-        if (k === 'a' || k === 'arrowleft') keys.left = down
-        if (k === 'd' || k === 'arrowright') keys.right = down
-        // Toggle debug overlay on Shift+D (reliable cross-platform)
-        if (k === 'd' && down && e.shiftKey) {
-          debugOverlay.toggle()
-        }
-        setVelocityFromInput()
-      }
-
-      const keydown = (e: KeyboardEvent) => onKey(true, e)
-      const keyup = (e: KeyboardEvent) => onKey(false, e)
-
-      window.addEventListener('keydown', keydown)
-      window.addEventListener('keyup', keyup)
+      // Track last debug toggle state to detect changes
+      let lastDebugState = false
 
       // Debug keys: H = damage -10, J = heal +10
       const debugDamageKey = (e: KeyboardEvent) => {
@@ -187,6 +161,16 @@ const App = () => {
         // Update world time for game logic (cooldowns, timers, etc.)
         world.updateTime(dt)
 
+        // Update input and player movement
+        inputSystem.update(world, player, dt)
+
+        // Handle debug overlay toggle
+        const debugPressed = inputSystem.isActionPressed(INPUT_ACTIONS.DEBUG_TOGGLE)
+        if (debugPressed && !lastDebugState) {
+          debugOverlay.toggle()
+        }
+        lastDebugState = debugPressed
+
         // Update movement
         movementUpdate(world, dt)
 
@@ -204,8 +188,7 @@ const App = () => {
       // Cleanup on unmount or ready change
       return () => {
         running = false
-        window.removeEventListener('keydown', keydown)
-        window.removeEventListener('keyup', keyup)
+        inputSystem.detach()
         window.removeEventListener('keydown', debugDamageKey)
         unsubscribe()
       }
