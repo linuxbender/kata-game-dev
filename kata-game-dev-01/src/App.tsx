@@ -2,11 +2,10 @@ import React, { useEffect, useRef } from 'react'
 import { createWorld } from './game/setupWorld'
 import { createMovementSystem } from './engine/systems/MovementSystem'
 import { createEnemyAISystem } from './engine/systems/EnemyAISystem'
-import { createEnemyVisualizationSystem } from './engine/systems/EnemyVisualizationSystem'
 import { createRenderSystem } from './engine/systems/RenderSystem'
 import { createQuadTree } from './engine/spatial/QuadTree'
 import { createDebugOverlay } from './engine/systems/DebugOverlay'
-import type { World } from './engine/ECS'
+import type { TypedWorld } from './engine/componentTypes'
 import { COMPONENTS } from './engine/constants'
 import { useCanvas } from './hooks/useCanvas'
 import { useQuadConfig } from './contexts/QuadConfigContext'
@@ -14,7 +13,7 @@ import { useQuadConfig } from './contexts/QuadConfigContext'
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
   const { canvasRef, ready, dpr } = useCanvas()
-  const worldRef = useRef<World | null>(null)
+  const worldRef = useRef<TypedWorld | null>(null)
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
@@ -64,7 +63,7 @@ const App = () => {
       const trackedEntities = new Set<number>()
 
       // Populate quad tree with initial entities
-      const initial = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
+      const initial = world.query(COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE)
       for (const e of initial) {
         const id = e.entity
         const t = e.comps[0] as { x: number; y: number }
@@ -82,7 +81,7 @@ const App = () => {
           trackedEntities.add(id)
         } else if (ev.type === 'update') {
           const id = ev.entity
-          const pos = world.getComponent<{ x: number; y: number }>(id, COMPONENTS.TRANSFORM)
+          const pos = world.getComponent(id, COMPONENTS.TRANSFORM)
           if (pos) {
             if (quad.has(id)) quad.update(id, pos.x, pos.y)
             else { quad.insert({ x: pos.x, y: pos.y, entity: id }); trackedEntities.add(id) }

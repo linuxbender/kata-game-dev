@@ -1,7 +1,7 @@
-import type { World, Entity } from '../ECS'
+import type { Entity } from '../ECS'
+import type { TypedWorld } from '../componentTypes'
 import { COMPONENTS } from '../constants'
 import { CameraConfig, DEFAULT_CAMERA_CONFIG, computeSmoothing, lerp, applyDeadZone } from './CameraConfig'
-import { createDebugOverlay } from './DebugOverlay'
 import { createEnemyVisualizationSystem } from './EnemyVisualizationSystem'
 
 export type RenderOptions = {
@@ -37,21 +37,21 @@ export const createRenderSystem = (
   let camXTarget = 0
   let camYTarget = 0
 
-  const update = (world: World, dt: number, canvasSize?: { width: number; height: number }, spatialIndex?: any) => {
+  const update = (world: TypedWorld, dt: number, canvasSize?: { width: number; height: number }, spatialIndex?: any) => {
     // Update DPR and apply transform so drawing uses logical coordinates
     dpr = options?.dpr ?? dpr
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     // Determine camera target position
     if (playerEntity !== undefined) {
-      const t = world.getComponent<{ x: number; y: number }>(playerEntity, COMPONENTS.TRANSFORM)
+      const t = world.getComponent(playerEntity, COMPONENTS.TRANSFORM)
       if (t) {
         // Apply look-ahead prediction if velocity is available
         let targetX = t.x
         let targetY = t.y
 
         if (cameraConfig.lookAheadFactor && cameraConfig.lookAheadFactor > 0) {
-          const v = world.getComponent<{ vx: number; vy: number }>(playerEntity, COMPONENTS.VELOCITY)
+          const v = world.getComponent(playerEntity, COMPONENTS.VELOCITY)
           if (v) {
             // Add velocity-based offset for predictive camera (1-3 frames ahead)
             const lookAheadDistance = 0.5 // Adjust for desired look-ahead effect
@@ -64,10 +64,11 @@ export const createRenderSystem = (
         camYTarget = targetY
       }
     } else {
-      const transforms = world.query([COMPONENTS.TRANSFORM])
+      const transforms = world.query(COMPONENTS.TRANSFORM)
       if (transforms.length) {
-        camXTarget = transforms[0].comps[0].x
-        camYTarget = transforms[0].comps[0].y
+        const t0 = transforms[0].comps[0] as { x: number; y: number }
+        camXTarget = t0.x
+        camYTarget = t0.y
       }
     }
 
@@ -105,8 +106,8 @@ export const createRenderSystem = (
       // Draw only candidate entities
       for (const c of candidates) {
         const ent = c.entity
-        const t = world.getComponent<{ x: number; y: number }>(ent, COMPONENTS.TRANSFORM)
-        const rend = world.getComponent<{ color: string; size: number }>(ent, COMPONENTS.RENDERABLE)
+        const t = world.getComponent(ent, COMPONENTS.TRANSFORM)
+        const rend = world.getComponent(ent, COMPONENTS.RENDERABLE)
         if (!t || !rend) continue
 
         const screenX = Math.round((t.x - camX) + viewW / 2)
@@ -118,7 +119,7 @@ export const createRenderSystem = (
       }
     } else {
       // Fallback: query all renderables from world (useful for small scenes)
-      const renderables = world.query([COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE])
+      const renderables = world.query(COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE)
       for (const r of renderables) {
         const t = r.comps[0] as { x: number; y: number }
         const rend = r.comps[1] as { color: string; size: number }

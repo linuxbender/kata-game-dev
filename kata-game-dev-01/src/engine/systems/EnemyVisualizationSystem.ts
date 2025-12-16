@@ -1,7 +1,7 @@
 // Enemy detection range visualization system
 // Draws dashed circle showing enemy detection radius
 
-import type { TypedWorld } from '../../engine/componentTypes'
+import type { TypedWorld } from '../componentTypes'
 import { COMPONENTS } from '../constants'
 import type { EnemyComponent } from '../../engine/components/Enemy'
 
@@ -17,7 +17,7 @@ export const createEnemyVisualizationSystem = () => {
     dpr: number
   ) => {
     // Query all enemies with transform
-    const enemies = world.query([COMPONENTS.ENEMY, COMPONENTS.TRANSFORM])
+    const enemies = world.query(COMPONENTS.ENEMY, COMPONENTS.TRANSFORM)
 
     for (const e of enemies) {
       const enemy = e.comps[0] as EnemyComponent

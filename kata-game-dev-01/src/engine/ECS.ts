@@ -84,14 +84,12 @@ export class World<C extends Record<string, any> = Record<string, any>> {
   }
 
   // Query entities that have all requested component names.
-  // The returned comps array is intentionally untyped here to preserve
-  // compatibility with existing code; use getComponent with generics for
-  // stricter typing at use sites.
-  query = (names: (keyof C & ComponentKey)[]): { entity: Entity; comps: any[] }[] => {
+  // Returns typed tuple in the same order as names.
+  query = <K extends readonly (keyof C & ComponentKey)[]>(...names: K): { entity: Entity; comps: { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } }[] => {
     if (names.length === 0) return []
     const first = this.components.get(names[0])
     if (!first) return []
-    const result: { entity: Entity; comps: any[] }[] = []
+    const result: { entity: Entity; comps: { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } }[] = []
     for (const [entity] of first) {
       let ok = true
       const comps: any[] = []
@@ -103,7 +101,7 @@ export class World<C extends Record<string, any> = Record<string, any>> {
         }
         comps.push(map.get(entity))
       }
-      if (ok) result.push({ entity, comps })
+      if (ok) result.push({ entity, comps: comps as any })
     }
     return result
   }

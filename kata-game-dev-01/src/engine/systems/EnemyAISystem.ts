@@ -47,7 +47,7 @@ export const createEnemyAISystem = () => {
   // Main update function
   const update = (world: TypedWorld) => {
     // Query all enemies
-    const enemies = world.query([COMPONENTS.ENEMY, COMPONENTS.TRANSFORM, COMPONENTS.VELOCITY])
+    const enemies = world.query(COMPONENTS.ENEMY, COMPONENTS.TRANSFORM, COMPONENTS.VELOCITY)
 
     for (const e of enemies) {
       const entity = e.entity
