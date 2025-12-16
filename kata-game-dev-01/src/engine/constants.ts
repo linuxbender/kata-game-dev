@@ -1,4 +1,4 @@
-// Component keys centralized to avoid string duplication and typos
+// Component keys: string enum provides autocomplete, refactoring safety, and runtime values
 export enum COMPONENTS {
   TRANSFORM = 'Transform',
   VELOCITY = 'Velocity',
@@ -7,26 +7,22 @@ export enum COMPONENTS {
   HEALTH = 'Health'
 }
 
-// ComponentKey is the enum type
-export type ComponentKey = COMPONENTS
+// ComponentKey extracts the string literal union from enum values
+export type ComponentKey = `${COMPONENTS}`
 
-// Sentinel values and shared strings used across the engine/game.
-// Prefer using actual `undefined` (the JS value) to represent absence.
-// Use the string sentinel when you specifically need a string token
-// (for serialization, logging, or interoperability).
+// Sentinel values as const object (rare usage pattern, const is sufficient)
 export const SENTINELS = {
-    UNDEFINED_STRING: 'undefined'
+  UNDEFINED_STRING: 'undefined'
 } as const
 
 export type Sentinel = typeof SENTINELS[keyof typeof SENTINELS]
 
-// Centralized event type strings for component lifecycle events.
-// Use these instead of magic strings throughout the codebase.
+// Event types: string enum for consistency with COMPONENTS pattern
 export enum EVENT_TYPES {
-    ADD = 'add',
-    UPDATE = 'update',
-    REMOVE = 'remove'
+  ADD = 'add',
+  UPDATE = 'update',
+  REMOVE = 'remove'
 }
 
-// Export a type alias for convenience (the enum itself can be used as a type too)
-export type EventType = EVENT_TYPES
+// EventType extracts string literal union from enum
+export type EventType = `${EVENT_TYPES}`

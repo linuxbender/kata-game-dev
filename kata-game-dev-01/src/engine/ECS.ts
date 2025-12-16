@@ -4,66 +4,41 @@ import type { ComponentKey, EventType } from '@engine/constants'
 // Core ECS: World and basic types
 export type Entity = number
 
-// Component event types: produce a per-key discriminated union so
-// event handlers get strongly-typed `component` payloads when the
-// `name` is one of the world's known component keys. We also include
-// a string fallback to handle external/unknown component names at runtime.
-export type KnownComponentEvent<C extends Record<string, any>, K extends keyof C & ComponentKey> =
-  | { type: EVENT_TYPES.ADD | EVENT_TYPES.UPDATE; entity: Entity; name: K; component: C[K] }
+// Helper: map a generic key K (which may be a string key or a ComponentKey enum member)
+// to the actual key type used for indexing into GlobalComponents (i.e. keyof C)
+type ResolvedKey<C, K> = Extract<K, keyof C>
+
+// Component event types: K may be a literal key or an enum member; component type is resolved
+export type KnownComponentEvent<C extends Record<string, any>, K extends keyof C | ComponentKey> =
+  | { type: EVENT_TYPES.ADD | EVENT_TYPES.UPDATE; entity: Entity; name: K; component: C[ResolvedKey<C, K>] }
   | { type: EVENT_TYPES.REMOVE; entity: Entity; name: K }
 
 export type ComponentEvent<C extends Record<string, any> = Record<string, any>> =
-  // Union of all known-key events
-  | { [K in keyof C & ComponentKey]: KnownComponentEvent<C, K> }[keyof C & ComponentKey]
-  // Fallback for unknown/external names (keeps runtime flexibility)
+  | { [K in keyof C]: KnownComponentEvent<C, K> }[keyof C]
   | { type: EventType; entity: Entity; name: string; component?: unknown }
 
 /**
- * World stores components in maps keyed by component name.
- * Small pragmatic implementation intended for learning and extension.
- * Now supports component events so external systems (e.g., spatial index)
- * can react to component adds/updates/removals.
- *
- * Note: Public API accepts string for flexibility, but always use COMPONENTS.<KEY>
- * from constants.ts in practice for type safety and consistency.
+ * World stores components in maps keyed by component name (runtime string).
+ * This implementation accepts either enum members (COMPONENTS.X) or string
+ * literal keys ("Transform") at the API boundary and resolves them to the
+ * correct component type at compile time.
  */
 export class World<C extends Record<string, any> = Record<string, any>> {
   private nextId = 1
-  // Map from component key -> Map(entity -> component)
-  // Use `unknown` internally and narrow to specific C[K] when accessed —
-  // avoids wide `any` while keeping a single container for heterogeneous maps.
-  private components = new Map<keyof C & ComponentKey, Map<Entity, unknown>>()
-  // Listeners are typed against this world's component map
+  // Internal map uses string keys (the runtime values of the enum or raw strings)
+  private components = new Map<string, Map<Entity, unknown>>()
   private listeners = new Set<(e: ComponentEvent<C>) => void>()
-  private elapsedTime = 0  // Track elapsed time for game logic
+  private elapsedTime = 0
 
-  // Create a new entity id.
   createEntity = (): Entity => this.nextId++
-
-  // Get elapsed time in seconds since world creation
   getTime = (): number => this.elapsedTime
+  updateTime = (dt: number): void => { this.elapsedTime += dt }
 
-  // Update world time (called by game loop)
-  updateTime = (dt: number): void => {
-    this.elapsedTime += dt
-  }
+  onComponentEvent = (cb: (e: ComponentEvent<C>) => void) => { this.listeners.add(cb); return () => this.listeners.delete(cb) }
 
-  // Subscribe to component events. Returns an unsubscribe function.
-  onComponentEvent = (cb: (e: ComponentEvent<C>) => void) => {
-    this.listeners.add(cb)
-    return () => this.listeners.delete(cb)
-  }
-
-  /**
-   * Typed subscription helper for a specific known component key.
-   * The callback receives a narrowed event where `component` has the exact
-   * type for that component key (for 'add'/'update' events).
-   * Returns an unsubscribe function.
-   */
-  onComponentEventFor = <K extends keyof C & ComponentKey>(name: K, cb: (ev: KnownComponentEvent<C, K>) => void) => {
+  onComponentEventFor = <K extends keyof C | ComponentKey>(name: K, cb: (ev: KnownComponentEvent<C, K>) => void) => {
     const wrapper = (e: ComponentEvent<C>) => {
-      // Narrow by runtime name equality; if matched, cast to known event type
-      if (e.name === name) cb(e as KnownComponentEvent<C, K>)
+      if (e.name === (name as unknown as string)) cb(e as KnownComponentEvent<C, K>)
     }
     this.listeners.add(wrapper)
     return () => this.listeners.delete(wrapper)
@@ -71,69 +46,61 @@ export class World<C extends Record<string, any> = Record<string, any>> {
 
   private emit = (ev: ComponentEvent<C>) => {
     for (const l of Array.from(this.listeners)) {
-      try { l(ev) } catch (e) { /* listener errors shouldn't break world */ }
+      try { l(ev) } catch (e) { /* swallow listener errors */ }
     }
   }
 
   // Add or replace a component for an entity.
-  // Emits 'add' if it didn't exist before, otherwise 'update'.
-  addComponent = <K extends keyof C & ComponentKey>(entity: Entity, name: K, comp: C[K]): void => {
-    // Narrow the stored map to the concrete per-key map type for operations
-    let map = this.components.get(name) as Map<Entity, C[K]> | undefined
+  addComponent = <K extends keyof C | ComponentKey>(entity: Entity, name: K, comp: C[ResolvedKey<C, K>]): void => {
+    const key = String(name)
+    let map = this.components.get(key) as Map<Entity, C[ResolvedKey<C, K>]> | undefined
     if (!map) {
-      map = new Map<Entity, C[K]>()
-      // Note: stored as Map<Entity, unknown> under the hood
-      this.components.set(name, map as Map<Entity, unknown>)
+      map = new Map<Entity, C[ResolvedKey<C, K>]>()
+      this.components.set(key, map as Map<Entity, unknown>)
     }
     const existed = map.has(entity)
-    map.set(entity, comp)
-    // Emit a strongly-typed event for known keys (name is K here)
+    map.set(entity, comp as unknown as C[ResolvedKey<C, K>])
     const ev: KnownComponentEvent<C, K> = {
       type: existed ? EVENT_TYPES.UPDATE : EVENT_TYPES.ADD,
       entity,
       name,
-      component: comp
+      component: comp as unknown as C[ResolvedKey<C, K>]
     }
     this.emit(ev)
   }
 
-  // Get a component of a specific entity if present.
-  getComponent = <K extends keyof C & ComponentKey>(entity: Entity, name: K): C[K] | undefined => {
-    // Narrow stored map to the concrete type; avoids returning `unknown`.
-    const map = this.components.get(name) as Map<Entity, C[K]> | undefined
+  getComponent = <K extends keyof C | ComponentKey>(entity: Entity, name: K): C[ResolvedKey<C, K>] | undefined => {
+    const key = String(name)
+    const map = this.components.get(key) as Map<Entity, C[ResolvedKey<C, K>]> | undefined
     return map?.get(entity)
   }
 
-  // Inform listeners that a component has been updated in-place.
-  // Useful when systems mutate component objects directly and want to notify subscribers.
-  markComponentUpdated = <K extends keyof C & ComponentKey>(entity: Entity, name: K) => {
+  markComponentUpdated = <K extends keyof C | ComponentKey>(entity: Entity, name: K) => {
     const comp = this.getComponent(entity, name)
     if (comp !== undefined) {
-      // Emit a typed KnownComponentEvent for this specific key K
-      const ev: KnownComponentEvent<C, K> = { type: EVENT_TYPES.UPDATE, entity, name, component: comp }
+      const ev: KnownComponentEvent<C, K> = { type: EVENT_TYPES.UPDATE, entity, name, component: comp as C[ResolvedKey<C, K>] }
       this.emit(ev)
     }
   }
 
-  // Query entities that have all requested component names.
-  // Returns typed tuple in the same order as names.
-  query = <K extends readonly (keyof C & ComponentKey)[]>(...names: K): { entity: Entity; comps: { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } }[] => {
+  query = <K extends readonly (keyof C | ComponentKey)[]>(...names: K): { entity: Entity; comps: { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : K[P] extends ComponentKey ? C[ResolvedKey<C, K[P]>] : never } }[] => {
     if (names.length === 0) return []
-    const first = this.components.get(names[0])
+    const firstKey = String(names[0])
+    const first = this.components.get(firstKey)
     if (!first) return []
-    const result: { entity: Entity; comps: { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } }[] = []
+    const result: { entity: Entity; comps: any[] }[] = []
     for (const [entity] of first) {
       let ok = true
       const comps: unknown[] = []
       for (const n of names) {
-        const map = this.components.get(n) as Map<Entity, unknown> | undefined
+        const key = String(n)
+        const map = this.components.get(key) as Map<Entity, unknown> | undefined
         if (!map || !map.has(entity)) { ok = false; break }
         comps.push(map.get(entity))
       }
-      if (ok) {
-        result.push({ entity, comps: comps as { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : never } })
-      }
+      if (ok) result.push({ entity, comps })
     }
-    return result
+    // cast to the precise return type
+    return result as any
   }
 }
