@@ -53,8 +53,17 @@ instructions: |
     where they improve type safety and code clarity.
   - use advanced React patterns (hooks, context, computed components, functional)
     where they improve code reuse and maintainability.
+  - do not create large classes with many responsibilities.
+    prefer small, focused functions and components.
+  - prefer composition over inheritance.
+  - write automated tests for new features and bug fixes.
+  - when suggesting code changes, include relevant test cases.
+  - don't wirte summary or explanation outside of code comments.
+    only provide code changes. don't write anything else.
+  - clean code is more important than clever code.
+    prefer readability and maintainability over brevity or performance
+    optimizations unless absolutely necessary.
   
-
   Monorepo-specific hints
   - If uncertain which package to modify, prefer making suggestions in
     "kata-game-dev-01/" because it contains the main game package.
