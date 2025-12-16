@@ -37,6 +37,14 @@ export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
 
       const c = canvasRef.current
       if (c) {
+        // Ensure canvas is visible and positioned to fill the viewport
+        c.style.display = 'block'
+        c.style.position = 'absolute'
+        c.style.top = '0'
+        c.style.left = '0'
+        // Ensure a default background so the canvas area is visible even if page styles differ
+        if (!c.style.backgroundColor) c.style.backgroundColor = '#07121a'
+
         // Set CSS size (logical pixels)
         c.style.width = `${width}px`
         c.style.height = `${height}px`

@@ -16,6 +16,8 @@ export type SpatialIndex = {
   query: (range: { x: number; y: number; w: number; h: number }) => { x: number; y: number; entity: number }[]
 }
 
+export type HudRenderer = (ctx: CanvasRenderingContext2D, world: TypedWorld, camX: number, camY: number, viewW: number, viewH: number, dpr: number) => void
+
 // Render system factory: draws entities with smooth camera follow (dead zone + predictive).
 // Performs frustum culling and supports spatial indexing for large worlds.
 export const createRenderSystem = (
@@ -23,7 +25,8 @@ export const createRenderSystem = (
   playerEntity?: Entity,
   options?: RenderOptions,
   spatialIndex?: SpatialIndex,
-  debugOverlay?: any
+  debugOverlay?: any,
+  hudRenderer?: HudRenderer
 ) => {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('2D context not available')
@@ -147,6 +150,15 @@ export const createRenderSystem = (
     // Draw enemy detection ranges
     const enemyVisualizationSystem = createEnemyVisualizationSystem()
     enemyVisualizationSystem.update(ctx, world, camX, camY, viewW, viewH, dpr)
+
+    // Call optional HUD renderer (draw UI into canvas after scene)
+    if (hudRenderer) {
+      // Save/restore to avoid interfering with scene transforms
+      ctx.save()
+      // HUD should draw in logical pixels already (we've set transform earlier)
+      hudRenderer(ctx, world, camX, camY, viewW, viewH, dpr)
+      ctx.restore()
+    }
   }
 
   return { update }

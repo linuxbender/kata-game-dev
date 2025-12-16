@@ -3,10 +3,9 @@
 
 import type { Health } from '@components/Health'
 
-declare module './componentTypes' {
+declare module '@engine/componentTypes' {
   interface GlobalComponents {
     // Add Health component to the global map
     Health: Health
   }
 }
-
