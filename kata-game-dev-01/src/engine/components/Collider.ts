@@ -6,14 +6,16 @@ export interface Collider {
   solid: boolean // if false, can pass through
 }
 
-// Collision layers as enum flags
-export enum COLLISION_LAYERS {
-  NONE = 0,
-  PLAYER = 1 << 0,
-  ENEMY = 1 << 1,
-  PROJECTILE = 1 << 2,
-  WALL = 1 << 3,
-  TRIGGER = 1 << 4,
-  ALL = 0xFFFFFFFF
-}
+// Collision layers as const object with bitfield values
+export const COLLISION_LAYERS = {
+  NONE: 0,
+  PLAYER: 1 << 0,
+  ENEMY: 1 << 1,
+  PROJECTILE: 1 << 2,
+  WALL: 1 << 3,
+  TRIGGER: 1 << 4,
+  ALL: 0xFFFFFFFF
+} as const satisfies Record<string, number>
+
+export type CollisionLayer = typeof COLLISION_LAYERS[keyof typeof COLLISION_LAYERS]
 

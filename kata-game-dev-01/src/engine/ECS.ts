@@ -10,8 +10,8 @@ type ResolvedKey<C, K> = Extract<K, keyof C>
 
 // Component event types: K may be a literal key or an enum member; component type is resolved
 export type KnownComponentEvent<C extends Record<string, any>, K extends keyof C | ComponentKey> =
-  | { type: EVENT_TYPES.ADD | EVENT_TYPES.UPDATE; entity: Entity; name: K; component: C[ResolvedKey<C, K>] }
-  | { type: EVENT_TYPES.REMOVE; entity: Entity; name: K }
+  | { type: typeof EVENT_TYPES.ADD | typeof EVENT_TYPES.UPDATE; entity: Entity; name: K; component: C[ResolvedKey<C, K>] }
+  | { type: typeof EVENT_TYPES.REMOVE; entity: Entity; name: K }
 
 export type ComponentEvent<C extends Record<string, any> = Record<string, any>> =
   | { [K in keyof C]: KnownComponentEvent<C, K> }[keyof C]

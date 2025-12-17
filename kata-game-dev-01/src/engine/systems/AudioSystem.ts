@@ -11,14 +11,16 @@ export interface AudioConfig {
   masterVolume: number // 0-1
 }
 
-export enum AUDIO_EVENTS {
-  PLAYER_JUMP = 'playerJump',
-  PLAYER_DAMAGE = 'playerDamage',
-  ENEMY_HIT = 'enemyHit',
-  ENEMY_DEATH = 'enemyDeath',
-  COLLECT_ITEM = 'collectItem',
-  UI_CLICK = 'uiClick'
-}
+export const AUDIO_EVENTS = {
+  PLAYER_JUMP: 'playerJump',
+  PLAYER_DAMAGE: 'playerDamage',
+  ENEMY_HIT: 'enemyHit',
+  ENEMY_DEATH: 'enemyDeath',
+  COLLECT_ITEM: 'collectItem',
+  UI_CLICK: 'uiClick'
+} as const satisfies Record<string, string>
+
+export type AudioEvent = typeof AUDIO_EVENTS[keyof typeof AUDIO_EVENTS]
 
 const DEFAULT_CONFIG: AudioConfig = {
   sfx: {},

@@ -1,19 +1,19 @@
 import { COMPONENTS } from '@engine/constants'
 import type { TypedWorld } from '@engine/componentTypes'
 
-// Input action types as enum for type safety
-export enum INPUT_ACTIONS {
-  MOVE_UP = 'moveUp',
-  MOVE_DOWN = 'moveDown',
-  MOVE_LEFT = 'moveLeft',
-  MOVE_RIGHT = 'moveRight',
-  ACTION_PRIMARY = 'actionPrimary',
-  ACTION_SECONDARY = 'actionSecondary',
-  DEBUG_TOGGLE = 'debugToggle',
-  PAUSE = 'pause'
-}
+// Input action types as const object for type safety
+export const INPUT_ACTIONS = {
+  MOVE_UP: 'moveUp',
+  MOVE_DOWN: 'moveDown',
+  MOVE_LEFT: 'moveLeft',
+  MOVE_RIGHT: 'moveRight',
+  ACTION_PRIMARY: 'actionPrimary',
+  ACTION_SECONDARY: 'actionSecondary',
+  DEBUG_TOGGLE: 'debugToggle',
+  PAUSE: 'pause'
+} as const satisfies Record<string, string>
 
-export type InputAction = `${INPUT_ACTIONS}`
+export type InputAction = typeof INPUT_ACTIONS[keyof typeof INPUT_ACTIONS]
 
 // Input configuration mapping actions to key bindings
 export interface InputMapping {
@@ -81,7 +81,7 @@ export const createInputSystem = (config: Partial<InputSystemConfig> = {}) => {
   }
 
   // Check if a specific action is currently pressed
-  const isActionPressed = (action: INPUT_ACTIONS): boolean => {
+  const isActionPressed = (action: InputAction): boolean => {
     return actionStates.get(action) || false
   }
 

@@ -13,12 +13,14 @@ export interface Scene {
   onInput?: (action: string) => void
 }
 
-export enum SCENE_NAMES {
-  MENU = 'menu',
-  GAMEPLAY = 'gameplay',
-  PAUSE = 'pause',
-  GAME_OVER = 'gameOver'
-}
+export const SCENE_NAMES = {
+  MENU: 'menu',
+  GAMEPLAY: 'gameplay',
+  PAUSE: 'pause',
+  GAME_OVER: 'gameOver'
+} as const satisfies Record<string, string>
+
+export type SceneName = typeof SCENE_NAMES[keyof typeof SCENE_NAMES]
 
 /**
  * Scene manager (prepared, not yet integrated)
