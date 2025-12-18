@@ -25,10 +25,38 @@ export type ComponentEvent<C extends ComponentSchema = ComponentSchema> =
     | { type: EventType; entity: Entity; name: string; component?: unknown }
 
 /**
- * World stores components in maps keyed by component name (runtime string).
- * This implementation accepts either enum members (COMPONENTS.X) or string
- * literal keys ("Transform") at the API boundary and resolves them to the
- * correct component type at compile time.
+ * World: manages entities and their components
+ * @template C Component schema type
+ *
+ * @example
+ * ```ts
+ * // Define component schema
+ * interface MyComponents {
+ *   position: { x: number; y: number };
+ *   velocity: { dx: number; dy: number };
+ * }
+ *
+ * // Create a world instance
+ * const world = new World<MyComponents>();
+ *
+ * // Create an entity
+ * const entity = world.createEntity();
+ *
+ * // Add components to the entity
+ * world.addComponent(entity, 'position', { x: 0, y: 0 });
+ * world.addComponent(entity, 'velocity', { dx: 1, dy: 1 });
+ *
+ * // Query entities with specific components
+ * const results = world.query('position', 'velocity');
+ * for (const { entity, comps } of results) {
+ *   const [position, velocity] = comps;
+ *   console.log(`Entity ${entity} - Position: (${position.x}, ${position.y}), Velocity: (${velocity.dx}, ${velocity.dy})`);
+ * }
+ *
+ * // Listen for component events
+ * const unsubscribe = world.onComponentEventFor('position', (event) => {
+ *   console.log(`Position component event:`, event);
+ * });
  */
 export class World<C extends ComponentSchema = ComponentSchema> {
     private nextId = 1
