@@ -267,6 +267,9 @@ export class World<C extends ComponentSchema = ComponentSchema> {
      * const results = world.query('position', 'velocity');
      * for (const { entity, comps } of results) {
      *   const [position, velocity] = comps;
+     *   console.log(`Entity ${entity}
+     *                  Position: (${position.x}, ${position.y}),
+     *                  Velocity: (${velocity.dx}, ${velocity.dy})`);
      * }
      * ```
      */
