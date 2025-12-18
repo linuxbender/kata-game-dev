@@ -1,4 +1,4 @@
-html,body,#root { height: 100%; margin: 0; }
+html,body,#root { height: 100%; margin: 0; padding: 0;  overflow: hidden}
 body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-canvas { display: block; background: #080808; }
+canvas { display: block; background: #080808; width: 100%; height: 100% }
 

@@ -8,12 +8,14 @@ export type Entity = number
 // to the actual key type used for indexing into GlobalComponents (i.e. keyof C)
 type ResolvedKey<C, K> = Extract<K, keyof C>
 
+export type ComponentSchema = Record<string, any>
+
 // Component event types: K may be a literal key or an enum member; component type is resolved
-export type KnownComponentEvent<C extends Record<string, any>, K extends keyof C | ComponentKey> =
+export type KnownComponentEvent<C extends ComponentSchema, K extends keyof C | ComponentKey> =
   | { type: typeof EVENT_TYPES.ADD | typeof EVENT_TYPES.UPDATE; entity: Entity; name: K; component: C[ResolvedKey<C, K>] }
   | { type: typeof EVENT_TYPES.REMOVE; entity: Entity; name: K }
 
-export type ComponentEvent<C extends Record<string, any> = Record<string, any>> =
+export type ComponentEvent<C extends ComponentSchema = ComponentSchema> =
   | { [K in keyof C]: KnownComponentEvent<C, K> }[keyof C]
   | { type: EventType; entity: Entity; name: string; component?: unknown }
 
@@ -23,7 +25,7 @@ export type ComponentEvent<C extends Record<string, any> = Record<string, any>> 
  * literal keys ("Transform") at the API boundary and resolves them to the
  * correct component type at compile time.
  */
-export class World<C extends Record<string, any> = Record<string, any>> {
+export class World<C extends ComponentSchema = ComponentSchema> {
   private nextId = 1
   // Internal map uses string keys (the runtime values of the enum or raw strings)
   private components = new Map<string, Map<Entity, unknown>>()
