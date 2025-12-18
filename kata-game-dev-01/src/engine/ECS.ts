@@ -192,9 +192,9 @@ export class World<C extends ComponentSchema = ComponentSchema> {
 
     /**
      * Add a component to an entity
-     * @param entity
-     * @param name
-     * @param comp
+     * @param entity Entity identifier
+     * @param name Component name or key
+     * @param comp Component data to add
      * @example
      * ```ts
      * world.addComponent(entity, 'position', { x: 0, y: 0 });
@@ -220,14 +220,14 @@ export class World<C extends ComponentSchema = ComponentSchema> {
     }
 
     /**
-     * Remove a component from an entity
-     * @param entity
-     * @param name
+     * Get a component from an entity
+     * @param entity Entity identifier
+     * @param name Component name or key
+     * @returns Component data or undefined if not found
      * @example
      * ```ts
-     * world.removeComponent(entity, 'position');
+     * const position = world.getComponent(entity, 'position');
      * ```
-     * @returns void
      */
     getComponent = <K extends keyof C | ComponentKey>(entity: Entity, name: K): C[ResolvedKey<C, K>] | undefined => {
         const key = String(name)
@@ -236,15 +236,14 @@ export class World<C extends ComponentSchema = ComponentSchema> {
     }
 
     /**
-     * Remove a component from an entity
-     * @param entity
-     * @param name
+     * Mark a component as updated and emit update event
+     * @param entity Entity identifier
+     * @param name Component name or key
      * @example
      * ```ts
-     * world.removeComponent(entity, 'position');
+     * world.markComponentUpdated(entity, 'position');
      * ```
      * @returns void
-     *
      */
     markComponentUpdated = <K extends keyof C | ComponentKey>(entity: Entity, name: K) => {
         const comp = this.getComponent(entity, name)
@@ -260,13 +259,16 @@ export class World<C extends ComponentSchema = ComponentSchema> {
     }
 
     /**
-     * Remove a component from an entity
-     * @param names
+     * Query entities with specific components
+     * @param names Component names or keys to query for
+     * @returns Array of entities with their components
      * @example
      * ```ts
-     * world.removeComponent(entity, 'position');
+     * const results = world.query('position', 'velocity');
+     * for (const { entity, comps } of results) {
+     *   const [position, velocity] = comps;
+     * }
      * ```
-     * @returns void
      */
     query = <K extends readonly (keyof C | ComponentKey)[]>(...names: K): {
         entity: Entity;
