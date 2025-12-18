@@ -1,16 +1,77 @@
 import type {ComponentKey, EventType} from '@engine/constants'
 import {EVENT_TYPES} from '@engine/constants'
 
-// Core ECS: World and basic types
+/**
+ * Entity type
+ * @example
+ * ```ts
+ * const entity: Entity = 1;
+ * ```
+ * @return Entity identifier
+ */
 export type Entity = number
 
-// Helper: map a generic key K (which may be a string key or a ComponentKey enum member)
-// to the actual key type used for indexing into GlobalComponents (i.e. keyof C)
+/**
+ * Resolve component key type
+ * @template C Component schema type
+ * @template K Component name/key
+ * @returns Resolved key type
+ * @example
+ * ```ts
+ * // Define component schema
+ * interface MyComponents {
+ *  position: { x: number; y: number };
+ *  velocity: { dx: number; dy: number };
+ *  }
+ *  // Resolved key for 'position'
+ *  type PositionKey = ResolvedKey<MyComponents, 'position'>; // 'position'
+ *  // Resolved key for ComponentKey enum member
+ *  type VelocityKey = ResolvedKey<MyComponents, ComponentKey.VELOCITY>; // 'velocity'
+ *  ```
+ */
 type ResolvedKey<C, K> = Extract<K, keyof C>
 
+/**
+ * Component schema: maps component names/types to their data structures
+ * @example
+ * ```ts
+ * // Define component schema
+ * interface MyComponents {
+ *   position: { x: number; y: number };
+ *   velocity: { dx: number; dy: number };
+ * }
+ * ```
+ * @return Component schema type
+ */
 export type ComponentSchema = Record<string, any>
 
-// Component event types: K may be a literal key or an enum member; component type is resolved
+/**
+ * Known component event: for a specific component name/type
+ * @template C Component schema type
+ * @template K Component name/key
+ * @example
+ * ```ts
+ * // Define component schema
+ * interface MyComponents {
+ *  position: { x: number; y: number };
+ *  velocity: { dx: number; dy: number };
+ *  }
+ *  // Known component event for 'position'
+ *  const positionEvent: KnownComponentEvent<MyComponents, 'position'> = {
+ *  type: EVENT_TYPES.ADD,
+ *  entity: 1,
+ *  name: 'position',
+ *  component: { x: 0, y: 0 }
+ *  };
+ *  // Known component event for ComponentKey enum member
+ *  const velocityEvent: KnownComponentEvent<MyComponents, ComponentKey.VELOCITY> = {
+ *  type: EVENT_TYPES.UPDATE,
+ *  entity: 1,
+ *  name: ComponentKey.VELOCITY,
+ *  component: { dx: 1, dy: 1 }
+ *  };
+ *  ```
+ */
 export type KnownComponentEvent<C extends ComponentSchema, K extends keyof C | ComponentKey> =
     | {
     type: typeof EVENT_TYPES.ADD | typeof EVENT_TYPES.UPDATE;
@@ -20,6 +81,11 @@ export type KnownComponentEvent<C extends ComponentSchema, K extends keyof C | C
 }
     | { type: typeof EVENT_TYPES.REMOVE; entity: Entity; name: K }
 
+/**
+ * Component event: either a known component event or a generic one
+ * for unknown component names/types
+ * @template C Component schema type
+ */
 export type ComponentEvent<C extends ComponentSchema = ComponentSchema> =
     | { [K in keyof C]: KnownComponentEvent<C, K> }[keyof C]
     | { type: EventType; entity: Entity; name: string; component?: unknown }
@@ -70,12 +136,38 @@ export class World<C extends ComponentSchema = ComponentSchema> {
     updateTime = (dt: number): void => {
         this.elapsedTime += dt
     }
-
+    /**
+     * Register a callback for all component events
+     * @param cb Callback to invoke on component events
+     * @returns Unsubscribe function
+     * @example
+     * ```ts
+     * const unsubscribe = world.onComponentEvent((event) => {
+     *   console.log(`Component event:`, event);
+     * });
+     * // To unsubscribe later:
+     * unsubscribe();
+     * ```
+     */
     onComponentEvent = (cb: (e: ComponentEvent<C>) => void) => {
         this.listeners.add(cb);
         return () => this.listeners.delete(cb)
     }
 
+    /**
+     * Register a callback for specific component events
+     * @param name Component name or key to listen for
+     * @param cb Callback to invoke on matching component events
+     * @returns Unsubscribe function
+     * @example
+     * ```ts
+     * const unsubscribe = world.onComponentEventFor('position', (event) => {
+     *   console.log(`Position component event:`, event);
+     * });
+     * // To unsubscribe later:
+     * unsubscribe();
+     * ```
+     */
     onComponentEventFor = <K extends keyof C | ComponentKey>(name: K, cb: (ev: KnownComponentEvent<C, K>) => void) => {
         const wrapper = (e: ComponentEvent<C>) => {
             if (e.name === (name as unknown as string)) cb(e as KnownComponentEvent<C, K>)
@@ -84,6 +176,11 @@ export class World<C extends ComponentSchema = ComponentSchema> {
         return () => this.listeners.delete(wrapper)
     }
 
+    /**
+     * Emit a component event to all listeners
+     * @param ev Component event to emit
+     * @private
+     */
     private emit = (ev: ComponentEvent<C>) => {
         for (const l of Array.from(this.listeners)) {
             try {
@@ -93,7 +190,17 @@ export class World<C extends ComponentSchema = ComponentSchema> {
         }
     }
 
-    // Add or replace a component for an entity.
+    /**
+     * Add a component to an entity
+     * @param entity
+     * @param name
+     * @param comp
+     * @example
+     * ```ts
+     * world.addComponent(entity, 'position', { x: 0, y: 0 });
+     * ```
+     * @returns void
+     */
     addComponent = <K extends keyof C | ComponentKey>(entity: Entity, name: K, comp: C[ResolvedKey<C, K>]): void => {
         const key = String(name)
         let map = this.components.get(key) as Map<Entity, C[ResolvedKey<C, K>]> | undefined
@@ -112,12 +219,33 @@ export class World<C extends ComponentSchema = ComponentSchema> {
         this.emit(ev)
     }
 
+    /**
+     * Remove a component from an entity
+     * @param entity
+     * @param name
+     * @example
+     * ```ts
+     * world.removeComponent(entity, 'position');
+     * ```
+     * @returns void
+     */
     getComponent = <K extends keyof C | ComponentKey>(entity: Entity, name: K): C[ResolvedKey<C, K>] | undefined => {
         const key = String(name)
         const map = this.components.get(key) as Map<Entity, C[ResolvedKey<C, K>]> | undefined
         return map?.get(entity)
     }
 
+    /**
+     * Remove a component from an entity
+     * @param entity
+     * @param name
+     * @example
+     * ```ts
+     * world.removeComponent(entity, 'position');
+     * ```
+     * @returns void
+     *
+     */
     markComponentUpdated = <K extends keyof C | ComponentKey>(entity: Entity, name: K) => {
         const comp = this.getComponent(entity, name)
         if (comp !== undefined) {
@@ -131,6 +259,15 @@ export class World<C extends ComponentSchema = ComponentSchema> {
         }
     }
 
+    /**
+     * Remove a component from an entity
+     * @param names
+     * @example
+     * ```ts
+     * world.removeComponent(entity, 'position');
+     * ```
+     * @returns void
+     */
     query = <K extends readonly (keyof C | ComponentKey)[]>(...names: K): {
         entity: Entity;
         comps: { [P in keyof K]: K[P] extends keyof C ? C[K[P]] : K[P] extends ComponentKey ? C[ResolvedKey<C, K[P]>] : never }
@@ -154,7 +291,6 @@ export class World<C extends ComponentSchema = ComponentSchema> {
             }
             if (ok) result.push({entity, comps})
         }
-        // cast to the precise return type
         return result as any
     }
 }
