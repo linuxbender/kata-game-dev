@@ -1,20 +1,67 @@
 import type {Point} from '@components'
 
+/**
+ * Rectangle boundary definition for spatial partitioning
+ * @property x - Left edge x-coordinate
+ * @property y - Top edge y-coordinate
+ * @property w - Width of rectangle
+ * @property h - Height of rectangle
+ */
 export type Rect = { x: number; y: number; w: number; h: number }
+
+/**
+ * Point item with entity reference
+ * Combines spatial position with entity identifier for tracking
+ * @property x - X coordinate
+ * @property y - Y coordinate
+ * @property entity - Unique entity identifier
+ */
 export type PointItem = Point & { entity: number }
 
+/**
+ * Quad tree configuration and tuning options
+ *
+ * @property mergeThreshold - Occupancy fraction [0..1] below which child nodes merge with parent (default 0.25)
+ * @property rebalanceInterval - Number of operations before batch rebalance (default 256)
+ * @property autoTune - Automatic parameter tuning configuration
+ *   - enabled: Enable auto-tuning (default true)
+ *   - intervalOps: How often auto-tune runs in operations (default rebalanceInterval * 4)
+ *   - targetOccupancyFraction: Desired occupancy per child [0..1] (default 0.5)
+ * @property onConfigChange - Callback when tuning parameters change (for persistence)
+ *
+ * @example
+ * ```ts
+ * const options: QuadOptions = {
+ *   mergeThreshold: 0.3,
+ *   rebalanceInterval: 512,
+ *   autoTune: { enabled: true, targetOccupancyFraction: 0.6 },
+ *   onConfigChange: (cfg) => console.log('Config updated:', cfg)
+ * }
+ * ```
+ */
 export type QuadOptions = {
-    mergeThreshold?: number // fraction [0..1] average occupancy per child under which merging is allowed (default 0.25)
-    rebalanceInterval?: number // number of operations after which a batch rebalance is triggered (default 256)
+    mergeThreshold?: number
+    rebalanceInterval?: number
     autoTune?: {
         enabled?: boolean
-        intervalOps?: number // how often auto-tune runs (ops)
-        targetOccupancyFraction?: number // desired occupancy fraction of capacity per child (0..1)
+        intervalOps?: number
+        targetOccupancyFraction?: number
     }
-    // Optional callback invoked when internal tuning parameters change
     onConfigChange?: (cfg: { mergeThreshold: number; rebalanceInterval: number }) => void
 }
 
+/**
+ * Performance and structure metrics for the quad tree
+ *
+ * Used to monitor tree health and guide auto-tuning decisions
+ * @property opCounter - Current operation counter
+ * @property splits - Total number of node splits performed
+ * @property merges - Total number of node merges performed
+ * @property nodes - Current number of nodes in tree
+ * @property items - Total items stored in tree
+ * @property avgItemsPerNode - Average items per node
+ * @property avgChildOccupancy - Average item count per child node (when divided)
+ */
 export type QuadMetrics = {
     opCounter: number
     splits: number
@@ -25,6 +72,45 @@ export type QuadMetrics = {
     avgChildOccupancy?: number
 }
 
+/**
+ * Factory function to create a quad tree for spatial partitioning
+ *
+ * A quad tree recursively subdivides 2D space into quadrants to efficiently
+ * organize and query spatial data. This implementation includes:
+ * - Automatic node splitting when capacity is exceeded
+ * - Node merging when underutilized
+ * - Automatic parameter tuning via metrics
+ * - Batch rebalancing to maintain structure
+ * - O(1) entity lookups via internal map
+ *
+ * @template T - Item type, must extend Point with entity property
+ *
+ * @param boundary - Root boundary rectangle
+ * @param capacity - Max items per node before splitting (default 8)
+ * @param maxDepth - Maximum tree depth to prevent infinite recursion (default 8)
+ * @param options - Optional tuning and callback configuration
+ *
+ * @returns Quad tree API object with methods for insert, query, update, etc.
+ *
+ * @example
+ * ```ts
+ * const quadTree = createQuadTree({ x: 0, y: 0, w: 100, h: 100 }, 8)
+ *
+ * // Insert items
+ * quadTree.insert({ x: 25, y: 25, entity: 1 })
+ * quadTree.insert({ x: 75, y: 75, entity: 2 })
+ *
+ * // Query range
+ * const results = quadTree.query({ x: 0, y: 0, w: 50, h: 50 })
+ * console.log(results) // [{ x: 25, y: 25, entity: 1 }]
+ *
+ * // Update position
+ * quadTree.update(1, 50, 50)
+ *
+ * // Get metrics
+ * console.log(quadTree.getMetrics())
+ * ```
+ */
 export const createQuadTree = <T extends Point & { entity: number } = PointItem>(
     boundary: Rect,
     capacity = 8,
