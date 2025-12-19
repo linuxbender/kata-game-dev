@@ -6,6 +6,12 @@ import type {Point} from '@components'
  * @property y - Top edge y-coordinate
  * @property w - Width of rectangle
  * @property h - Height of rectangle
+ *
+ * @example
+ * ```ts
+ * const boundary: Rect = { x: 0, y: 0, w: 100, h: 100 }
+ * // Represents a 100x100 area starting at top-left (0,0)
+ * ```
  */
 export type Rect = { x: number; y: number; w: number; h: number }
 
@@ -15,19 +21,56 @@ export type Rect = { x: number; y: number; w: number; h: number }
  * @property x - X coordinate
  * @property y - Y coordinate
  * @property entity - Unique entity identifier
+ *
+ * @example
+ * ```ts
+ * const enemy: PointItem = { x: 50, y: 75, entity: 42 }
+ * ```
  */
 export type PointItem = Point & { entity: number }
 
 /**
  * Quad tree configuration and tuning options
  *
- * @property mergeThreshold - Occupancy fraction [0..1] below which child nodes merge with parent (default 0.25)
- * @property rebalanceInterval - Number of operations before batch rebalance (default 256)
+ * **What is this?** These parameters control how the quad tree behaves:
+ * - When it splits nodes into smaller pieces
+ * - When it merges nodes back together
+ * - How often it optimizes itself
+ *
+ * **Why auto-tuning?** Different game scenarios need different settings:
+ * - Many enemies at one location → merge aggressively
+ * - Enemies spread everywhere → keep tree deep for fast queries
+ *
+ * **How it works:**
+ * ```
+ * Game Start: mergeThreshold = 0.25, rebalanceInterval = 256
+ *              ↓ (play game, collect metrics)
+ * After 1000 ops: "Hmm, nodes too empty..."
+ *              ↓ (run autoTune)
+ * Adjustment: mergeThreshold = 0.30, rebalanceInterval = 200
+ *              ↓ (tree adapts to current game state!)
+ * ```
+ *
+ * @property mergeThreshold - Occupancy fraction [0..1] below which child nodes merge with parent
+ *   - Lower (0.1) = aggressive merging (fewer, larger nodes)
+ *   - Higher (0.5) = conservative merging (more, smaller nodes)
+ *   - Default: 0.25 (merge if avg child has < 25% of capacity)
+ *
+ * @property rebalanceInterval - How many operations before batch rebalance runs
+ *   - Lower (100) = frequent rebalancing (slower but better structure)
+ *   - Higher (500) = rare rebalancing (faster but potentially unbalanced)
+ *   - Default: 256 (every 256 insert/update/remove operations)
+ *
  * @property autoTune - Automatic parameter tuning configuration
- *   - enabled: Enable auto-tuning (default true)
- *   - intervalOps: How often auto-tune runs in operations (default rebalanceInterval * 4)
- *   - targetOccupancyFraction: Desired occupancy per child [0..1] (default 0.5)
- * @property onConfigChange - Callback when tuning parameters change (for persistence)
+ *   - enabled: Enable self-optimization (default true)
+ *   - intervalOps: How often auto-tune runs, in operations (default rebalanceInterval * 4)
+ *   - targetOccupancyFraction: Desired average items per child [0..1]
+ *     * 0.5 means: try to keep each child ~50% full
+ *     * Helps tree stay balanced and efficient
+ *
+ * @property onConfigChange - Callback when tuning parameters change
+ *   - Called whenever auto-tune adjusts mergeThreshold or rebalanceInterval
+ *   - Use this to persist changes to localStorage
  *
  * @example
  * ```ts
@@ -35,8 +78,12 @@ export type PointItem = Point & { entity: number }
  *   mergeThreshold: 0.3,
  *   rebalanceInterval: 512,
  *   autoTune: { enabled: true, targetOccupancyFraction: 0.6 },
- *   onConfigChange: (cfg) => console.log('Config updated:', cfg)
+ *   onConfigChange: (cfg) => {
+ *     // Save optimal settings for next game session
+ *     localStorage.setItem('quadtree_config', JSON.stringify(cfg))
+ *   }
  * }
+ * const quadTree = createQuadTree(boundary, 8, 8, options)
  * ```
  */
 export type QuadOptions = {
@@ -53,14 +100,34 @@ export type QuadOptions = {
 /**
  * Performance and structure metrics for the quad tree
  *
- * Used to monitor tree health and guide auto-tuning decisions
- * @property opCounter - Current operation counter
+ * **What do these tell you?** Health metrics to diagnose tree performance:
+ *
+ * ```
+ * Example metrics:
+ * {
+ *   opCounter: 512,           ← Operations since last reset
+ *   splits: 8,                ← Nodes subdivided (growth)
+ *   merges: 2,                ← Nodes merged back (shrinking)
+ *   nodes: 12,                ← Total nodes in tree
+ *   items: 47,                ← Total items stored
+ *   avgItemsPerNode: 3.9,     ← Items per node (lower = more scattered)
+ *   avgChildOccupancy: 2.4    ← Items per child when divided (should match target!)
+ * }
+ * ```
+ *
+ * **How to read it:**
+ * - avgItemsPerNode ≈ (items / nodes): High = tree clustered, Low = tree spread out
+ * - avgChildOccupancy: Auto-tune adjusts mergeThreshold to hit targetOccupancyFraction
+ * - splits > merges: Tree growing (expanding world or entities spreading)
+ * - merges > splits: Tree shrinking (consolidating clusters)
+ *
+ * @property opCounter - Current operation counter (insert/update/remove count)
  * @property splits - Total number of node splits performed
  * @property merges - Total number of node merges performed
  * @property nodes - Current number of nodes in tree
  * @property items - Total items stored in tree
- * @property avgItemsPerNode - Average items per node
- * @property avgChildOccupancy - Average item count per child node (when divided)
+ * @property avgItemsPerNode - Average items per node (should be close to capacity/2 ideally)
+ * @property avgChildOccupancy - Average item count per child node when parent is divided
  */
 export type QuadMetrics = {
     opCounter: number
@@ -75,40 +142,92 @@ export type QuadMetrics = {
 /**
  * Factory function to create a quad tree for spatial partitioning
  *
- * A quad tree recursively subdivides 2D space into quadrants to efficiently
- * organize and query spatial data. This implementation includes:
- * - Automatic node splitting when capacity is exceeded
- * - Node merging when underutilized
- * - Automatic parameter tuning via metrics
- * - Batch rebalancing to maintain structure
- * - O(1) entity lookups via internal map
+ * **What is a Quad Tree?** A tree that recursively divides 2D space into 4 quadrants
+ *
+ * ```
+ * Visual Structure (depth 2):
+ *
+ *        ┌──────────────────────┐
+ *        │                      │
+ *        │   Root (100×100)     │
+ *        │                      │
+ *        └────┬────────────┬────┘
+ *             │            │
+ *      ┌──────┴──┐  ┌──────┴──┐
+ *      │   NW    │  │   NE    │  ← Quadrants (50×50 each)
+ *      │ (25,25) │  │(75, 25) │
+ *      └────┬────┘  └────┬────┘
+ *      ┌────┴────┐  ┌────┴────┐
+ *      │   SW    │  │   SE    │
+ *      │(25, 75) │  │(75, 75) │
+ *      └─────────┘  └─────────┘
+ *
+ * NW = North West (top-left)
+ * NE = North East (top-right)
+ * SW = South West (bottom-left)
+ * SE = South East (bottom-right)
+ * ```
+ *
+ * **Why use it?**
+ * - Fast spatial queries: O(log n) instead of O(n)
+ * - Example: "Find all enemies near player" → only check relevant quadrants
+ * - Automatic optimization: splits when crowded, merges when sparse
+ *
+ * **Features:**
+ * - ⚡ Automatic node splitting when capacity exceeded
+ * - 🔄 Node merging when underutilized
+ * - 🧠 Automatic parameter tuning based on game metrics
+ * - ⏱️ Batch rebalancing to maintain structure
+ * - 🔍 O(1) entity lookups via internal map
+ *
+ * **How it works in gameplay:**
+ * ```
+ * Insert: Enemy spawns at (45, 60)
+ *   → Finds which quadrant contains it
+ *   → If quadrant full, splits into 4 smaller quadrants
+ *   → Distributes existing items into new quadrants
+ *
+ * Query: "What enemies are near player at (50, 50) in range 30?"
+ *   → Query rectangle: {x: 20, y: 20, w: 60, h: 60}
+ *   → Only checks quadrants that overlap this range
+ *   → Returns [Enemy1, Enemy3] ✓ (ignores Enemy2 far away)
+ *
+ * Update: Enemy moves from (45, 60) to (80, 80)
+ *   → If still in same quadrant: just update position O(1)
+ *   → If moved to different quadrant: remove & re-insert O(log n)
+ * ```
  *
  * @template T - Item type, must extend Point with entity property
  *
- * @param boundary - Root boundary rectangle
- * @param capacity - Max items per node before splitting (default 8)
- * @param maxDepth - Maximum tree depth to prevent infinite recursion (default 8)
+ * @param boundary - Root boundary rectangle defining the game world
+ * @param capacity - Max items per node before splitting (default 8, higher = fewer nodes, slower queries)
+ * @param maxDepth - Maximum tree depth to prevent infinite recursion (default 8, balance query speed vs memory)
  * @param options - Optional tuning and callback configuration
  *
- * @returns Quad tree API object with methods for insert, query, update, etc.
+ * @returns Quad tree API object with methods for spatial operations
  *
  * @example
  * ```ts
+ * // Create quad tree for 100×100 game world, max 8 items per node
  * const quadTree = createQuadTree({ x: 0, y: 0, w: 100, h: 100 }, 8)
  *
- * // Insert items
- * quadTree.insert({ x: 25, y: 25, entity: 1 })
- * quadTree.insert({ x: 75, y: 75, entity: 2 })
+ * // Insert entities
+ * quadTree.insert({ x: 25, y: 25, entity: 1 })  // Player
+ * quadTree.insert({ x: 50, y: 50, entity: 2 })  // Enemy 1
+ * quadTree.insert({ x: 75, y: 75, entity: 3 })  // Enemy 2
  *
- * // Query range
- * const results = quadTree.query({ x: 0, y: 0, w: 50, h: 50 })
- * console.log(results) // [{ x: 25, y: 25, entity: 1 }]
+ * // Spatial query: Find all items in a 50×50 range
+ * const inRange = quadTree.query({ x: 0, y: 0, w: 50, h: 50 })
+ * console.log(inRange)  // [{ x: 25, y: 25, entity: 1 }, { x: 50, y: 50, entity: 2 }]
  *
- * // Update position
- * quadTree.update(1, 50, 50)
+ * // Update entity position
+ * quadTree.update(2, 60, 60)  // Enemy 1 moves to (60, 60)
+ * quadTree.remove(3)           // Enemy 2 removed
  *
- * // Get metrics
- * console.log(quadTree.getMetrics())
+ * // Performance monitoring
+ * const metrics = quadTree.getMetrics()
+ * console.log(`Tree has ${metrics.nodes} nodes, ${metrics.items} items`)
+ * console.log(`Avg items per node: ${metrics.avgItemsPerNode.toFixed(2)}`)
  * ```
  */
 export const createQuadTree = <T extends Point & { entity: number } = PointItem>(
@@ -467,5 +586,171 @@ export const createQuadTree = <T extends Point & { entity: number } = PointItem>
 
     const getMetrics = (): QuadMetrics => computeMetrics()
 
-    return {insert, remove, update, clear, query, getRoot, has, getMetrics}
+    /**
+     * Quad Tree API - All available operations
+     *
+     * **Visual: How operations interact:**
+     * ```
+     * Game Loop:
+     * ┌────────────────────────────────────┐
+     * │ Each Frame:                        │
+     * │ 1. Update enemy positions          │
+     * │    quadTree.update(enemyId, x, y)  │
+     * │                                    │
+     * │ 2. Query visible enemies           │
+     * │    nearby = quadTree.query(range)  │
+     * │                                    │
+     * │ 3. Remove dead enemies             │
+     * │    quadTree.remove(deadId)         │
+     * │                                    │
+     * │ 4. Monitor performance             │
+     * │    metrics = quadTree.getMetrics() │
+     * └────────────────────────────────────┘
+     *
+     * Auto-tuning (every N operations):
+     *   - Analyzes tree structure
+     *   - Adjusts mergeThreshold & rebalanceInterval
+     *   - Optimizes for current game state
+     * ```
+     */
+    return {
+        /**
+         * Insert a new item into the quad tree
+         *
+         * **Complexity:** O(log n) average, O(n) worst case (if many items in same quadrant)
+         *
+         * **What happens:**
+         * ```
+         * insert({ x: 45, y: 60, entity: 5 })
+         *   → Find which quadrant contains (45, 60)
+         *   → If quadrant has space: add item ✓
+         *   → If full and depth < maxDepth: split quadrant into 4 children
+         *   → Redistribute items into children
+         * ```
+         *
+         * @param item - Item to insert with x, y, entity properties
+         * @returns true if insertion succeeded, false if outside boundary
+         */
+        insert,
+
+        /**
+         * Remove an item from the quad tree
+         *
+         * **Complexity:** O(1) for item lookup (via entityMap), O(log n) for tree traversal if needed
+         *
+         * **What happens:**
+         * ```
+         * remove(5)  // Remove entity with id 5
+         *   → Look up which node contains entity 5 (O(1) via entityMap)
+         *   → Remove from that node
+         *   → Try merging parent nodes if underfull
+         *   → Tree may consolidate back up
+         * ```
+         *
+         * @param entity - Entity ID to remove
+         * @returns true if entity was found and removed, false if not found
+         */
+        remove,
+
+        /**
+         * Update entity position in the tree
+         *
+         * **Complexity:** O(1) if stays in same quadrant, O(log n) if moves to different quadrant
+         *
+         * **What happens:**
+         * ```
+         * update(5, 80, 80)  // Entity 5 moves to (80, 80)
+         *   → Check if new position still in same quadrant
+         *   → If yes: just update x, y (fast! O(1))
+         *   → If no: remove from old quadrant, insert into new one
+         * ```
+         *
+         * **Performance tip:** Frequent updates in same quadrant = fast!
+         *                    Entity hopping between quadrants = slower
+         *
+         * @param entity - Entity ID to update
+         * @param x - New x coordinate
+         * @param y - New y coordinate
+         * @returns true if update succeeded
+         */
+        update,
+
+        /**
+         * Query all items within a rectangular range
+         *
+         * **Complexity:** O(k + log n) where k = items found
+         *
+         * **Why fast?** Only checks quadrants that overlap the query rectangle
+         *
+         * **What happens:**
+         * ```
+         * query({ x: 20, y: 20, w: 60, h: 60 })
+         *
+         * World:
+         * ┌──────────────────────┐
+         * │    ╔═════════╗       │
+         * │    ║ Query   ║       │
+         * │ ┌─┼┼─┬────┬─┼┼─┐    │
+         * │ │NW││NE│  │SE││SE│   │
+         * │ └─┼┼─┴────┴─┼┼─┘    │
+         * │    ║        ║       │
+         * │    ╚═════════╝       │
+         * └──────────────────────┘
+         *
+         * → Only checks NW, NE, SE quadrants
+         * → Ignores SW (doesn't overlap)
+         * → Returns items found in overlapping quadrants
+         * ```
+         *
+         * @param range - Query rectangle {x, y, w, h}
+         * @returns Array of items found in the range
+         */
+        query,
+
+        /**
+         * Check if an entity exists in the tree
+         *
+         * **Complexity:** O(1) - direct map lookup!
+         *
+         * @param entity - Entity ID to check
+         * @returns true if entity is in the tree, false otherwise
+         */
+        has,
+
+        /**
+         * Clear all items from the tree and reset counters
+         *
+         * **Complexity:** O(n) - must visit all nodes
+         *
+         * **Use case:** Level load, game reset, memory cleanup
+         */
+        clear,
+
+        /**
+         * Get performance metrics about the tree structure
+         *
+         * **What to watch:**
+         * ```
+         * metrics = getMetrics()
+         *
+         * ✓ Good: avgItemsPerNode ≈ 4 (balanced)
+         * ✗ Bad:  avgItemsPerNode ≈ 0.5 (too sparse/many empty nodes)
+         * ✗ Bad:  avgItemsPerNode > 8 (crowded/too few nodes)
+         *
+         * splits > merges  → Tree growing
+         * merges > splits  → Tree shrinking/consolidating
+         * ```
+         *
+         * @returns QuadMetrics object with tree health information
+         */
+        getMetrics,
+
+        /**
+         * Get reference to root node (for advanced debugging)
+         *
+         * @returns Root node of the quad tree
+         */
+        getRoot
+    }
 }
+
