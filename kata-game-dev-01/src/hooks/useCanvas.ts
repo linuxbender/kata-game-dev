@@ -1,91 +1,161 @@
-import { useEffect, useRef, useState } from 'react'
+import {useEffect, useRef, useState} from 'react'
 
+/**
+ * Represents canvas or window dimensions
+ * @property width Canvas width in logical pixels
+ * @property height Canvas height in logical pixels
+ */
 export type Size = { width: number; height: number }
 
-// Hook to manage a canvas ref with automatic resize, high-DPI support, and debounced updates.
-// Handles window resize events, DPR changes, and orientation changes with proper cleanup.
+/**
+ * React Hook for managing a canvas element with responsive behavior and high-DPI support
+ *
+ * Features:
+ * - Automatic canvas resizing to match window dimensions
+ * - High-DPI support via devicePixelRatio (retina displays)
+ * - Debounced resize handling to reduce excessive updates
+ * - Orientation change detection for mobile devices
+ * - Media query monitoring for DPR changes
+ * - Proper cleanup of event listeners and timeouts
+ * - SSR-safe (checks for window before accessing)
+ *
+ * The canvas backing store is scaled by devicePixelRatio to ensure crisp rendering
+ * on high-DPI displays while CSS styling uses logical pixels.
+ *
+ * @param initialWidth - Initial canvas width in pixels (defaults to window.innerWidth)
+ * @param initialHeight - Initial canvas height in pixels (defaults to window.innerHeight)
+ *
+ * @returns Object containing:
+ *   - canvasRef: React ref to attach to canvas element
+ *   - canvasSize: Current canvas dimensions in logical pixels
+ *   - ready: Flag indicating canvas is configured and ready
+ *   - dpr: Current device pixel ratio (for renderer context scaling)
+ *
+ * @example
+ * ```tsx
+ * const CanvasComponent = () => {
+ *   const { canvasRef, canvasSize, ready, dpr } = useCanvas(800, 600)
+ *
+ *   useEffect(() => {
+ *     if (!ready) return
+ *     const ctx = canvasRef.current?.getContext('2d')
+ *     if (!ctx) return
+ *
+ *     // Scale context for high-DPI displays
+ *     ctx.scale(dpr, dpr)
+ *
+ *     // Draw using logical pixels
+ *     ctx.fillStyle = 'blue'
+ *     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height)
+ *   }, [ready, canvasSize, dpr])
+ *
+ *   return <canvas ref={canvasRef} />
+ * }
+ * ```
+ */
 export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [canvasSize, setCanvasSize] = useState<Size>({
-    width: initialWidth || (typeof window !== 'undefined' ? window.innerWidth : 300),
-    height: initialHeight || (typeof window !== 'undefined' ? window.innerHeight : 150)
-  })
-  const [ready, setReady] = useState(false)
+    const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  // device pixel ratio at time of resize; returned so renderer can set context transform
-  const [dpr, setDpr] = useState<number>(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+    // Canvas dimensions in logical pixels (CSS size)
+    const [canvasSize, setCanvasSize] = useState<Size>({
+        width: initialWidth || (typeof window !== 'undefined' ? window.innerWidth : 300),
+        height: initialHeight || (typeof window !== 'undefined' ? window.innerHeight : 150)
+    })
 
-  useEffect(() => {
-    let mq: MediaQueryList | null = null
-    let resizeTimeout: number | null = null
+    // Flag indicating canvas is fully configured and ready to render
+    const [ready, setReady] = useState(false)
 
-    // Debounced resize handler to avoid excessive reconfigurations
-    const debouncedConfigure = () => {
-      if (resizeTimeout !== null) {
-        clearTimeout(resizeTimeout)
-      }
-      resizeTimeout = window.setTimeout(configure, 100) as unknown as number
-    }
+    // Device pixel ratio used at time of last resize
+    // Used by renderer to scale drawing context for high-DPI displays
+    const [dpr, setDpr] = useState<number>(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
 
-    const configure = () => {
-      const width = window.innerWidth
-      const height = window.innerHeight
-      const devicePixelRatio = window.devicePixelRatio || 1
+    useEffect(() => {
+        let mq: MediaQueryList | null = null
+        let resizeTimeout: number | null = null
 
-      setCanvasSize({ width, height })
-      setDpr(devicePixelRatio)
+        /**
+         * Debounced handler for resize events
+         * Prevents excessive canvas reconfigurations during continuous window resizing
+         * Uses 100ms debounce delay for smooth transitions
+         */
+        const debouncedConfigure = () => {
+            if (resizeTimeout !== null) {
+                clearTimeout(resizeTimeout)
+            }
+            resizeTimeout = window.setTimeout(configure, 100) as unknown as number
+        }
 
-      const c = canvasRef.current
-      if (c) {
-        // Ensure canvas is visible and positioned to fill the viewport
-        c.style.display = 'block'
-        c.style.position = 'absolute'
-        c.style.top = '0'
-        c.style.left = '0'
-        // Ensure a default background so the canvas area is visible even if page styles differ
-        if (!c.style.backgroundColor) c.style.backgroundColor = '#07121a'
+        /**
+         * Main configuration function
+         * - Updates canvas dimensions to match current viewport
+         * - Scales canvas backing store for high-DPI displays
+         * - Sets CSS styling for absolute positioning
+         * - Monitors DPR changes via media queries
+         */
+        const configure = () => {
+            const width = window.innerWidth
+            const height = window.innerHeight
+            const devicePixelRatio = window.devicePixelRatio || 1
 
-        // Set CSS size (logical pixels)
-        c.style.width = `${width}px`
-        c.style.height = `${height}px`
-        // Set backing store size (physical pixels)
-        c.width = Math.max(1, Math.floor(width * devicePixelRatio))
-        c.height = Math.max(1, Math.floor(height * devicePixelRatio))
-      }
+            setCanvasSize({width, height})
+            setDpr(devicePixelRatio)
 
-      if (!ready) setReady(true)
+            const c = canvasRef.current
+            if (c) {
+                // Position and visibility styling
+                c.style.display = 'block'
+                c.style.position = 'absolute'
+                c.style.top = '0'
+                c.style.left = '0'
+                if (!c.style.backgroundColor) c.style.backgroundColor = '#07121a'
 
-      // Remove previous media query listener and create a new one for current DPR
-      if (mq) {
-        try { mq.removeEventListener('change', configure) } catch (e) { /* old browsers */ }
-        mq = null
-      }
-      try {
-        mq = window.matchMedia(`(resolution: ${devicePixelRatio}dppx)`)
-        mq.addEventListener('change', configure)
-      } catch (e) {
-        // matchMedia may not support addEventListener in older browsers; ignore
-      }
-    }
+                // CSS size (logical pixels) - how the canvas appears on screen
+                c.style.width = `${width}px`
+                c.style.height = `${height}px`
 
-    // initial configuration and attach window resize
-    configure()
-    // Use debounced resize to avoid excessive updates during window dragging
-    window.addEventListener('resize', debouncedConfigure)
-    // Listen for orientation changes (important on mobile)
-    window.addEventListener('orientationchange', debouncedConfigure)
+                // Backing store size (physical pixels) - internal resolution for high-DPI
+                c.width = Math.max(1, Math.floor(width * devicePixelRatio))
+                c.height = Math.max(1, Math.floor(height * devicePixelRatio))
+            }
 
-    return () => {
-      window.removeEventListener('resize', debouncedConfigure)
-      window.removeEventListener('orientationchange', debouncedConfigure)
-      if (resizeTimeout !== null) {
-        clearTimeout(resizeTimeout)
-      }
-      if (mq) {
-        try { mq.removeEventListener('change', configure) } catch (e) { /* ignore */ }
-      }
-    }
-  }, [])
+            if (!ready) setReady(true)
 
-  return { canvasRef, canvasSize, ready, dpr }
+            // Update media query listener for current DPR
+            if (mq) {
+                try {
+                    mq.removeEventListener('change', configure)
+                } catch (e) { /* old browsers */
+                }
+                mq = null
+            }
+            try {
+                mq = window.matchMedia(`(resolution: ${devicePixelRatio}dppx)`)
+                mq.addEventListener('change', configure)
+            } catch (e) {
+                // matchMedia may not support addEventListener in older browsers; ignore
+            }
+        }
+
+        // Initial setup and attach event listeners
+        configure()
+        window.addEventListener('resize', debouncedConfigure)
+        window.addEventListener('orientationchange', debouncedConfigure)
+
+        // Cleanup function: remove listeners and cancel pending timeouts
+        return () => {
+            window.removeEventListener('resize', debouncedConfigure)
+            window.removeEventListener('orientationchange', debouncedConfigure)
+            if (resizeTimeout !== null) {
+                clearTimeout(resizeTimeout)
+            }
+            if (mq) {
+                try {
+                    mq.removeEventListener('change', configure)
+                } catch (e) { /* ignore */
+                }
+            }
+        }
+    }, [])
+
+    return {canvasRef, canvasSize, ready, dpr}
 }
