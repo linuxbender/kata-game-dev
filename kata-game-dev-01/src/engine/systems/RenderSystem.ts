@@ -116,11 +116,14 @@ export const createRenderSystem = (
                 const rend = world.getComponent(ent, COMPONENTS.RENDERABLE)
                 if (!t || !rend) continue
 
+                // Support both legacy 'radius' and newer 'size' fields
+                const radius = (rend.size ?? rend.radius ?? 8)
+
                 const screenX = Math.round((t.x - camX) + viewW / 2)
                 const screenY = Math.round((t.y - camY) + viewH / 2)
                 ctx.fillStyle = rend.color
                 ctx.beginPath()
-                ctx.arc(screenX, screenY, rend.size, 0, Math.PI * 2)
+                ctx.arc(screenX, screenY, radius, 0, Math.PI * 2)
                 ctx.fill()
             }
         } else {
@@ -130,8 +133,11 @@ export const createRenderSystem = (
                 const t = r.comps[0]
                 const rend = r.comps[1]
 
+                // Determine radius compatibility
+                const radius = (rend.size ?? rend.radius ?? 8)
+
                 // Simple AABB culling using entity size
-                const s = rend.size
+                const s = radius
                 if (t.x + s < minX || t.x - s > maxX || t.y + s < minY || t.y - s > maxY) continue
 
                 // Convert world position to screen position (logical pixels)
@@ -140,7 +146,7 @@ export const createRenderSystem = (
 
                 ctx.fillStyle = rend.color
                 ctx.beginPath()
-                ctx.arc(screenX, screenY, rend.size, 0, Math.PI * 2)
+                ctx.arc(screenX, screenY, radius, 0, Math.PI * 2)
                 ctx.fill()
             }
         }

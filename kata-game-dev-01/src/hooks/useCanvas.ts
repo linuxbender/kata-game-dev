@@ -104,9 +104,10 @@ export const useCanvas = (initialWidth = 0, initialHeight = 0) => {
             if (c) {
                 // Position and visibility styling
                 c.style.display = 'block'
-                c.style.position = 'absolute'
+                c.style.position = 'fixed'
                 c.style.top = '0'
                 c.style.left = '0'
+                c.style.zIndex = '100'
                 if (!c.style.backgroundColor) c.style.backgroundColor = '#07121a'
 
                 // CSS size (logical pixels) - how the canvas appears on screen

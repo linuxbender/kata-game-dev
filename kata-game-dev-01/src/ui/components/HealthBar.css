@@ -1,0 +1,54 @@
+/**
+ * HealthBar Styles
+ */
+
+.health-bar {
+  position: relative;
+  display: inline-block;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.health-bar-background {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, #111, #050505);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+.health-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  height: 100%;
+  width: 0%;
+  transition: width 0.25s ease-out, background-color 0.25s ease-out;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.06);
+}
+
+.health-bar-text {
+  position: absolute;
+  inset: 0;
+  z-index: 3; /* above fill */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.health-bar.compact { border-radius: 3px; }
+.health-bar.compact .health-bar-text { font-size: 11px; }
+
+@keyframes health-damage { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+@keyframes health-pulse { 0%,100%{ opacity: 1 } 50% { opacity: 0.7 } }
+
+.health-bar-fill.empty { animation: health-damage 0.2s linear; }
+.health-bar-fill.low { animation: health-pulse 1s ease-in-out infinite; }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createWorld } from '@game/setupWorld'
 import { createMovementSystem } from '@engine/systems/MovementSystem'
 import { createEnemyAISystem } from '@engine/systems/EnemyAISystem'
@@ -6,38 +6,25 @@ import { createRenderSystem } from '@engine/systems/RenderSystem'
 import { createInputSystem, INPUT_ACTIONS } from '@engine/systems/InputSystem'
 import { createQuadTree } from '@engine/spatial/QuadTree'
 import { createDebugOverlay } from '@engine/systems/DebugOverlay'
-import type { TypedWorld } from '@engine/componentTypes'
+import { ReactiveWorld } from '@engine/ReactiveWorld'
 import { COMPONENTS, EVENT_TYPES } from '@engine/constants'
 import { useCanvas } from './hooks/useCanvas'
 import { useQuadConfig } from './contexts/QuadConfigContext'
-import { createCanvasHudRenderer } from '@game/HUD'
+import { GameStateProvider } from './contexts/GameStateContext'
+import { HealthBar } from './ui/components/HealthBar'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
-  const { canvasRef, ready, dpr } = useCanvas()
-  const worldRef = useRef<TypedWorld | null>(null)
+  const { canvasRef, ready, dpr, canvasSize } = useCanvas()
+  const worldRef = useRef<ReactiveWorld | null>(null)
   const playerRef = useRef<number | null>(null)
+
+  // State for GameStateProvider
+  const [gameWorld, setGameWorld] = useState<ReactiveWorld | null>(null)
+  const [gamePlayerId, setGamePlayerId] = useState<number | null>(null)
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
-
-  // Create a single stable canvas HUD renderer that reads the world/player refs.
-  // It internally keeps animation state and will be called each frame by the render system.
-  const canvasHudRef = useRef<ReturnType<typeof createCanvasHudRenderer> | null>(null)
-  if (!canvasHudRef.current) {
-    canvasHudRef.current = createCanvasHudRenderer(() => {
-      const w = worldRef.current
-      const p = playerRef.current
-      if (!w || p == null) return null
-      return w.getComponent(p, COMPONENTS.HEALTH) ?? null
-    })
-  }
-
-  // Stable wrapper passed to render system
-  const wrapperHudRenderer = (ctx: CanvasRenderingContext2D, world: TypedWorld, camX: number, camY: number, viewW: number, viewH: number, dpr: number) => {
-    const fn = canvasHudRef.current
-    if (fn) fn(ctx, world, camX, camY, viewW, viewH, dpr)
-  }
 
   useEffect(() => {
     if (!ready) return
@@ -46,9 +33,18 @@ const App = () => {
     if (!canvas) return
 
     try {
-      const { world, player, quadConfig } = createWorld()
-      worldRef.current = world
+      // Create ReactiveWorld instance
+      const reactiveWorld = new ReactiveWorld()
+
+      // Setup world with entities
+      const { player, quadConfig } = createWorld(reactiveWorld)
+
+      worldRef.current = reactiveWorld
       playerRef.current = player
+
+      // Set state for GameStateProvider
+      setGameWorld(reactiveWorld)
+      setGamePlayerId(player)
 
       const { update: movementUpdate } = createMovementSystem()
       const { update: enemyAIUpdate } = createEnemyAISystem()
@@ -78,6 +74,7 @@ const App = () => {
       const debugOverlay = createDebugOverlay(canvas)
 
       // Initialize render system with smooth camera follow and spatial culling
+      // NOTE: we no longer use a canvas-based HUD renderer; UI is React-based.
       const { update: renderUpdate } = createRenderSystem(canvas, player, {
         dpr,
         camera: {
@@ -85,13 +82,13 @@ const App = () => {
           deadZoneRadius: 3,
           lookAheadFactor: 0.2
         }
-      }, quad, debugOverlay, wrapperHudRenderer)
+      }, quad, debugOverlay)
 
       // Track entities in quad tree for incremental updates
       const trackedEntities = new Set<number>()
 
       // Populate quad tree with initial entities
-      const initial = world.query(COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE)
+      const initial = reactiveWorld.query(COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE)
       for (const e of initial) {
         const id = e.entity
         const t = e.comps[0]
@@ -100,7 +97,7 @@ const App = () => {
       }
 
       // Subscribe to world component events to keep spatial index synchronized
-      const unsubscribe = world.onComponentEvent((ev) => {
+      const unsubscribe = reactiveWorld.onComponentEvent((ev: any) => {
         if (ev.name !== COMPONENTS.TRANSFORM) return
         if (ev.type === EVENT_TYPES.ADD) {
           const id = ev.entity
@@ -109,7 +106,7 @@ const App = () => {
           trackedEntities.add(id)
         } else if (ev.type === EVENT_TYPES.UPDATE) {
           const id = ev.entity
-          const pos = world.getComponent(id, COMPONENTS.TRANSFORM)
+          const pos = reactiveWorld.getComponent(id, COMPONENTS.TRANSFORM)
           if (pos) {
             if (quad.has(id)) quad.update(id, pos.x, pos.y)
             else { quad.insert({ x: pos.x, y: pos.y, entity: id }); trackedEntities.add(id) }
@@ -136,15 +133,20 @@ const App = () => {
         if (key === 'h') {
           const hp = w.getComponent(p, COMPONENTS.HEALTH)
           if (hp) {
-            hp.current = Math.max(0, hp.current - 10)
-            w.markComponentUpdated(p, COMPONENTS.HEALTH)
+            const newHp = { ...hp, current: Math.max(0, hp.current - 10) }
+            w.addComponent(p, COMPONENTS.HEALTH, newHp)
+            // extra emit to be safe
+            try { w.markComponentUpdated(p, COMPONENTS.HEALTH) } catch (err) {/*ignore*/}
+            console.debug('[Debug] Applied damage, new health:', newHp)
           }
         }
         if (key === 'j') {
           const hp = w.getComponent(p, COMPONENTS.HEALTH)
           if (hp) {
-            hp.current = Math.min(hp.max, hp.current + 10)
-            w.markComponentUpdated(p, COMPONENTS.HEALTH)
+            const newHp = { ...hp, current: Math.min(hp.max, hp.current + 10) }
+            w.addComponent(p, COMPONENTS.HEALTH, newHp)
+            try { w.markComponentUpdated(p, COMPONENTS.HEALTH) } catch (err) {/*ignore*/}
+            console.debug('[Debug] Applied heal, new health:', newHp)
           }
         }
       }
@@ -159,10 +161,10 @@ const App = () => {
         last = now
 
         // Update world time for game logic (cooldowns, timers, etc.)
-        world.updateTime(dt)
+        reactiveWorld.updateTime(dt)
 
         // Update input and player movement
-        inputSystem.update(world, player, dt)
+        inputSystem.update(reactiveWorld, player, dt)
 
         // Handle debug overlay toggle
         const debugPressed = inputSystem.isActionPressed(INPUT_ACTIONS.DEBUG_TOGGLE)
@@ -172,13 +174,17 @@ const App = () => {
         lastDebugState = debugPressed
 
         // Update movement
-        movementUpdate(world, dt)
+        movementUpdate(reactiveWorld, dt)
 
         // Update enemy AI (targeting, movement, attacks)
-        enemyAIUpdate(world)
+        enemyAIUpdate(reactiveWorld)
 
         // Render frame (pass quad for debug metrics)
-        renderUpdate(world, dt, { width: canvas.width / dpr, height: canvas.height / dpr }, quad)
+        try {
+          renderUpdate(reactiveWorld, dt, { width: canvasSize.width, height: canvasSize.height }, quad)
+        } catch (renderError) {
+          console.error('❌ [Frame] Render error:', renderError)
+        }
 
         if (running) requestAnimationFrame(frame)
       }
@@ -193,14 +199,75 @@ const App = () => {
         unsubscribe()
       }
     } catch (error) {
-      console.error('App initialization error:', error)
+      console.error('❌ [App] Initialization error:', error)
+      if (error instanceof Error) {
+        console.error('Message:', error.message)
+        console.error('Stack:', error.stack)
+      }
     }
   }, [ready, dpr])
 
   return (
-    <div style={{ position: 'relative' }}>
-      <canvas ref={canvasRef} />
-    </div>
+    <GameStateProvider world={gameWorld} playerId={gamePlayerId}>
+      {/* Main game container */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          backgroundColor: '#000',
+        }}
+      >
+        {/* Canvas - now uses fixed positioning from useCanvas */}
+        <canvas ref={canvasRef} />
+
+        {/* React-based HealthBar overlay (single source of truth) */}
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            left: '20px',
+            zIndex: 1000,
+            pointerEvents: 'none',
+          }}
+        >
+          <HealthBar entity={gamePlayerId} width={250} height={35} />
+        </div>
+
+        {/* Debug info */}
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            zIndex: 1001,
+            color: '#0f0',
+            fontSize: '12px',
+            fontFamily: 'monospace',
+            pointerEvents: 'none',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            padding: '8px 12px',
+            borderRadius: '4px',
+          }}
+        >
+          <div>World: {gameWorld ? '✓' : '✗'}</div>
+          <div>Player: {gamePlayerId ? '✓' : '✗'}</div>
+          <div>Ready: {ready ? '✓' : '✗'}</div>
+          {/* Debug buttons (pointerEvents enabled) */}
+          <div style={{ marginTop: 8, pointerEvents: 'auto', display: 'flex', gap: 8 }}>
+            <button onClick={() => {
+              const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.max(0, hp.current - 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{}; console.debug('[DebugButton] Damage applied', newHp);
+            }}>Damage -10</button>
+            <button onClick={() => {
+              const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.min(hp.max, hp.current + 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{}; console.debug('[DebugButton] Heal applied', newHp);
+            }}>Heal +10</button>
+          </div>
+        </div>
+      </div>
+    </GameStateProvider>
   )
 }
 

@@ -490,15 +490,35 @@ describe('CombatSystem', () => {
     it('should handle healing during combat', () => {
       const encounterId = combatSystem.startCombat(player, enemy)
 
-      // Take damage
-      combatSystem.attack(enemy, player, sword, encounterId)
+      const initialHealth = combatSystem.getHealth(player)
 
-      const damageHealth = combatSystem.getHealth(player)
+      // Take damage - try multiple times to ensure at least one hit
+      let damageDealt = false
+      for (let i = 0; i < 20; i++) {
+        combatSystem.attack(enemy, player, sword, encounterId)
+        const currentHealth = combatSystem.getHealth(player)
+        if (currentHealth < initialHealth) {
+          damageDealt = true
+          break
+        }
+      }
 
-      // Heal
-      const healedHealth = combatSystem.heal(player, 20)
+      // Only test healing if damage was actually dealt
+      if (damageDealt) {
+        const damageHealth = combatSystem.getHealth(player)
 
-      expect(healedHealth).toBeGreaterThan(damageHealth)
+        // Heal
+        const healedHealth = combatSystem.heal(player, 20)
+
+        expect(healedHealth).toBeGreaterThan(damageHealth)
+      } else {
+        // If no damage in 20 tries, just verify heal works
+        const beforeHeal = combatSystem.getHealth(player)
+        combatSystem.setHealth(player, beforeHeal - 20) // Force damage
+        const afterDamage = combatSystem.getHealth(player)
+        const afterHeal = combatSystem.heal(player, 20)
+        expect(afterHeal).toBeGreaterThan(afterDamage)
+      }
     })
   })
 

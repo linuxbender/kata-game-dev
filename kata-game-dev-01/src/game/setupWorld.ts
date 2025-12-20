@@ -1,5 +1,5 @@
 import { World, Entity } from '@engine/ECS'
-import type { GlobalComponents, TypedWorld } from '@engine/componentTypes'
+import { COMPONENTS } from '@engine/constants'
 import {
   PLAYER_BLUEPRINT,
   GOBLIN_BLUEPRINT,
@@ -50,19 +50,25 @@ export type QuadConfig = {
  * ```
  */
 function instantiateBlueprint(
-  world: World<GlobalComponents>,
+  world: World,
   blueprint: EntityBlueprint,
   entityId: Entity
 ): void {
+  // Helper: map blueprint key (e.g. 'transform') to canonical runtime key from COMPONENTS (e.g. 'Transform')
+  const mapKey = (k: string) => {
+    const lower = k.toLowerCase()
+    const match = Object.values(COMPONENTS).find((v) => String(v).toLowerCase() === lower)
+    return match ?? k
+  }
+
   // Register all components from blueprint
   Object.entries(blueprint.components).forEach(([componentKey, componentData]) => {
     // Skip undefined components
     if (componentData === undefined) return
 
-    // Map component key to COMPONENTS enum value
-    // Using type assertion since component keys are strings at runtime
-    const key = componentKey as any
-    world.addComponent(entityId, key, componentData)
+    // Map to canonical component key used by the ECS
+    const key = mapKey(componentKey)
+    world.addComponent(entityId, key as any, componentData)
   })
 }
 
@@ -118,23 +124,25 @@ const NPC_SPAWNS: NPCSpawnConfig[] = [
  * - NPC entities for interaction
  * - Recommended QuadTree configuration
  *
+ * @param worldInstance - Optional world instance to use (defaults to new World)
  * @returns Object containing initialized world, player entity, and QuadTree config
  *
  * @example
  * ```ts
+ * // Create new world
  * const { world, player, quadConfig } = createWorld()
  *
- * // Player is now ready to control
- * // Enemies are spawned and positioned
- * // NPCs are placed for interaction
+ * // Use existing world instance
+ * const reactiveWorld = new ReactiveWorld()
+ * const { world, player, quadConfig } = createWorld(reactiveWorld)
  * ```
  */
-export const createWorld = (): {
-  world: TypedWorld
+export const createWorld = (worldInstance?: World): {
+  world: World
   player: Entity
   quadConfig: QuadConfig
 } => {
-  const world = new World<GlobalComponents>()
+  const world = worldInstance || new World()
 
   // 1. Create and setup player
   const player = world.createEntity()

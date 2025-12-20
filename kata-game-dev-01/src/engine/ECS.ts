@@ -298,4 +298,23 @@ export class World<C extends ComponentSchema = ComponentSchema> {
         }
         return result as any
     }
+
+    /**
+     * Get all entities in the world.
+     * @returns Array of all entity IDs
+     * @example
+     * ```ts
+     * const allEntities = world.getAllEntities()
+     * console.log(`Total entities: ${allEntities.length}`)
+     * ```
+     */
+    getAllEntities = (): Entity[] => {
+        const entities = new Set<Entity>()
+        for (const map of this.components.values()) {
+            for (const entity of map.keys()) {
+                entities.add(entity)
+            }
+        }
+        return Array.from(entities)
+    }
 }
