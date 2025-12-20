@@ -12,6 +12,9 @@ import { useCanvas } from './hooks/useCanvas'
 import { useQuadConfig } from './contexts/QuadConfigContext'
 import { GameStateProvider } from './contexts/GameStateContext'
 import { HealthBar } from './ui/components/HealthBar'
+import { pickupItem, consumeItem, dropItem } from '@game/GameActions'
+import { createItemInstance } from '@game/configs/ItemConfig'
+import InventoryPanel from './ui/components/InventoryPanel'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
@@ -22,6 +25,8 @@ const App = () => {
   // State for GameStateProvider
   const [gameWorld, setGameWorld] = useState<ReactiveWorld | null>(null)
   const [gamePlayerId, setGamePlayerId] = useState<number | null>(null)
+  const [inventoryVisible, setInventoryVisible] = useState(false)
+  const [inventoryVersion, setInventoryVersion] = useState(0)
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
@@ -118,13 +123,19 @@ const App = () => {
         }
       })
 
+      // Subscribe to inventory changes to force React updates for UI
+      const unsubInv = reactiveWorld.onComponentEventFor(COMPONENTS.INVENTORY as any, (ev: any) => {
+        // bump a version so we re-render InventoryPanel with latest items
+        setInventoryVersion(v => v + 1)
+      })
+
       // Attach input system listeners
       inputSystem.attach()
 
       // Track last debug toggle state to detect changes
       let lastDebugState = false
 
-      // Debug keys: H = damage -10, J = heal +10
+      // Debug keys: H = damage -10, J = heal +10, I = inventory toggle
       const debugDamageKey = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase()
         const w = worldRef.current
@@ -135,9 +146,7 @@ const App = () => {
           if (hp) {
             const newHp = { ...hp, current: Math.max(0, hp.current - 10) }
             w.addComponent(p, COMPONENTS.HEALTH, newHp)
-            // extra emit to be safe
             try { w.markComponentUpdated(p, COMPONENTS.HEALTH) } catch (err) {/*ignore*/}
-            console.debug('[Debug] Applied damage, new health:', newHp)
           }
         }
         if (key === 'j') {
@@ -146,11 +155,16 @@ const App = () => {
             const newHp = { ...hp, current: Math.min(hp.max, hp.current + 10) }
             w.addComponent(p, COMPONENTS.HEALTH, newHp)
             try { w.markComponentUpdated(p, COMPONENTS.HEALTH) } catch (err) {/*ignore*/}
-            console.debug('[Debug] Applied heal, new health:', newHp)
           }
         }
       }
+      const inventoryKey = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase()
+        if (key === 'i') setInventoryVisible(v => !v)
+        if (key === 'escape') setInventoryVisible(false)
+      }
       window.addEventListener('keydown', debugDamageKey)
+      window.addEventListener('keydown', inventoryKey)
 
       let last = performance.now()
       let running = true
@@ -196,7 +210,9 @@ const App = () => {
         running = false
         inputSystem.detach()
         window.removeEventListener('keydown', debugDamageKey)
+        window.removeEventListener('keydown', inventoryKey)
         unsubscribe()
+        unsubInv()
       }
     } catch (error) {
       console.error('❌ [App] Initialization error:', error)
@@ -237,6 +253,32 @@ const App = () => {
           <HealthBar entity={gamePlayerId} width={250} height={35} />
         </div>
 
+        {/* Inventory Panel - small fixed panel (no fullscreen backdrop) */}
+        {inventoryVisible && (
+          <div style={{ position: 'fixed', top: '80px', left: '20px', zIndex: 1002, pointerEvents: 'auto' }}>
+            <InventoryPanel
+              onClose={() => setInventoryVisible(false)}
+              items={
+                (gameWorld && gamePlayerId != null) ? ((gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY) as any[]) || []) : []
+              }
+              key={inventoryVersion}
+              onUse={(it) => {
+                const w = worldRef.current
+                const p = playerRef.current
+                if (!w || p == null) return
+                // call consumeItem which applies effects and decrements quantity
+                consumeItem(w as any, p, it.uid)
+              }}
+              onDrop={(it) => {
+                const w = worldRef.current
+                const p = playerRef.current
+                if (!w || p == null) return
+                dropItem(w as any, p, it.uid, 1)
+              }}
+            />
+          </div>
+        )}
+
         {/* Debug info */}
         <div
           style={{
@@ -259,13 +301,19 @@ const App = () => {
           {/* Debug buttons (pointerEvents enabled) */}
           <div style={{ marginTop: 8, pointerEvents: 'auto', display: 'flex', gap: 8 }}>
             <button onClick={() => {
-              const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.max(0, hp.current - 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{}; console.debug('[DebugButton] Damage applied', newHp);
-            }}>Damage -10</button>
+               const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.max(0, hp.current - 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
+             }}>Damage -10</button>
             <button onClick={() => {
-              const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.min(hp.max, hp.current + 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{}; console.debug('[DebugButton] Heal applied', newHp);
-            }}>Heal +10</button>
-          </div>
-        </div>
+               const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.min(hp.max, hp.current + 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
+             }}>Heal +10</button>
+            <button onClick={() => {
+              const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return;
+              const item = createItemInstance('potion_health', 1);
+              pickupItem(w as any, p, item);
+            }}>Pick Up</button>
+            <button onClick={() => setInventoryVisible(v => !v)}>Toggle Inventory (I)</button>
+           </div>
+         </div>
       </div>
     </GameStateProvider>
   )

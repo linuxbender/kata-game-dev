@@ -21,7 +21,8 @@ export const COMPONENTS = {
     VELOCITY: 'Velocity',
     RENDERABLE: 'Renderable',
     ENEMY: 'Enemy',
-    HEALTH: 'Health'
+    HEALTH: 'Health',
+    INVENTORY: 'Inventory'
 } as const satisfies Record<string, string>
 
 /**

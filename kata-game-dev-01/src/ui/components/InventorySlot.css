@@ -1,0 +1,69 @@
+.inventory-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: inherit;
+}
+
+.inventory-slot__icon {
+  flex: 0 0 48px;
+  height: 48px;
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.inventory-slot__icon-placeholder {
+  width: 28px;
+  height: 28px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+}
+
+.inventory-slot__info {
+  flex: 1;
+}
+
+.inventory-slot__name {
+  font-weight: 600;
+}
+
+.inventory-slot__desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+}
+
+.inventory-slot__meta {
+  width: 80px;
+  text-align: right;
+}
+
+.inventory-slot__qty {
+  font-size: 12px;
+}
+
+.inventory-slot__controls {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.inventory-slot button {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.06);
+  color: inherit;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.inventory-slot button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
