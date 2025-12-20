@@ -339,5 +339,190 @@ describe('EntityBlueprints', () => {
       })
     })
   })
+
+  describe('Advanced Scenarios', () => {
+    it('should support creating multiple variations of same blueprint', () => {
+      const goblin1 = createEntityFromBlueprint(GOBLIN_BLUEPRINT, {
+        components: { transform: { x: 100, y: 100 } },
+      })
+      const goblin2 = createEntityFromBlueprint(GOBLIN_BLUEPRINT, {
+        components: { transform: { x: 200, y: 200 } },
+      })
+      const goblin3 = createEntityFromBlueprint(GOBLIN_BLUEPRINT, {
+        components: { transform: { x: 300, y: 300 } },
+      })
+
+      expect(goblin1.components.transform.x).toBe(100)
+      expect(goblin2.components.transform.x).toBe(200)
+      expect(goblin3.components.transform.x).toBe(300)
+
+      // All should still have goblin health
+      expect(goblin1.components.health.max).toBe(20)
+      expect(goblin2.components.health.max).toBe(20)
+      expect(goblin3.components.health.max).toBe(20)
+    })
+
+    it('should allow partial component overrides', () => {
+      const toughPlayer = createEntityFromBlueprint(PLAYER_BLUEPRINT, {
+        components: {
+          health: { current: 200, max: 200 },
+        },
+      })
+
+      // Overridden
+      expect(toughPlayer.components.health.max).toBe(200)
+      // Unchanged
+      expect(toughPlayer.components.inventory.maxSlots).toBe(20)
+      expect(toughPlayer.components.stats.level).toBe(1)
+    })
+
+    it('should handle blueprint queries by type', () => {
+      const enemies = getBlueprintsByType('enemy')
+      const npcs = getBlueprintsByType('npc')
+      const items = getBlueprintsByType('item')
+
+      expect(enemies.length).toBeGreaterThanOrEqual(2) // At least goblin & orc
+      expect(npcs.length).toBeGreaterThanOrEqual(1)
+      expect(items.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('should handle blueprint queries by tag', () => {
+      const bosses = getBlueprintsByTag('boss')
+      const melee = getBlueprintsByTag('melee')
+
+      expect(bosses.length).toBeGreaterThan(0)
+      expect(melee.length).toBeGreaterThan(0)
+
+      // Boss should be in melee
+      const bossInMelee = melee.some(bp => bp.tags?.includes('boss'))
+      expect(bossInMelee).toBe(true)
+    })
+
+    it('should not mutate original blueprint when creating variations', () => {
+      const originalPlayerHealth = PLAYER_BLUEPRINT.components.health.max
+      const originalPlayerX = PLAYER_BLUEPRINT.components.transform.x
+
+      createEntityFromBlueprint(PLAYER_BLUEPRINT, {
+        components: {
+          health: { current: 999, max: 999 },
+          transform: { x: 999, y: 999 },
+        },
+      })
+
+      expect(PLAYER_BLUEPRINT.components.health.max).toBe(originalPlayerHealth)
+      expect(PLAYER_BLUEPRINT.components.transform.x).toBe(originalPlayerX)
+    })
+
+    it('should support chained blueprint modifications', () => {
+      const base = createEntityFromBlueprint(GOBLIN_BLUEPRINT, {
+        components: { health: { current: 40, max: 40 } },
+      })
+
+      const enhanced = createEntityFromBlueprint(base, {
+        components: { damage: { baseValue: 10, variance: 2 } },
+      })
+
+      expect(enhanced.components.health.max).toBe(40) // From first override
+      expect(enhanced.components.damage.baseValue).toBe(10) // From second override
+    })
+
+    it('should provide reasonable combat stats for each enemy type', () => {
+      const goblinDamagePerHealth = GOBLIN_BLUEPRINT.components.damage.baseValue / GOBLIN_BLUEPRINT.components.health.max
+      const orcDamagePerHealth = ORC_BLUEPRINT.components.damage.baseValue / ORC_BLUEPRINT.components.health.max
+
+      // Both should have reasonable damage-to-health ratios (not too high or low)
+      expect(goblinDamagePerHealth).toBeGreaterThan(0)
+      expect(orcDamagePerHealth).toBeGreaterThan(0)
+      expect(goblinDamagePerHealth).toBeLessThan(1) // Can't one-shot yourself
+      expect(orcDamagePerHealth).toBeLessThan(1)
+    })
+
+    it('should have consistent AI settings within enemy archetypes', () => {
+      // Both goblins and orcs are aggressive
+      expect(GOBLIN_BLUEPRINT.components.ai.type).toBe(ORC_BLUEPRINT.components.ai.type)
+
+      // But orcs detect from farther
+      expect(ORC_BLUEPRINT.components.ai.detectionRange).toBeGreaterThan(
+        GOBLIN_BLUEPRINT.components.ai.detectionRange
+      )
+    })
+
+    it('should verify item blueprints are droppable', () => {
+      const items = getBlueprintsByType('item')
+
+      items.forEach(item => {
+        expect(item.components.collider).toBeDefined()
+        expect(item.components.collider.isTrigger).toBe(true) // Items are triggers
+      })
+    })
+
+    it('should have proper merchant inventory setup', () => {
+      const merchant = MERCHANT_BLUEPRINT
+
+      expect(merchant.components.inventory).toBeDefined()
+      expect(merchant.components.inventory.items.length).toBeGreaterThan(0)
+
+      merchant.components.inventory.items.forEach((item: any) => {
+        expect(item.id).toBeDefined()
+        expect(item.type).toBeDefined()
+        expect(item.quantity).toBeGreaterThan(0)
+      })
+    })
+
+    it('should support blueprint filtering by multiple criteria', () => {
+      const combatUnits = getBlueprintsByType('enemy').filter(bp =>
+        bp.tags?.includes('melee')
+      )
+
+      expect(combatUnits.length).toBeGreaterThan(0)
+
+      combatUnits.forEach(unit => {
+        expect(unit.components.damage).toBeDefined()
+        expect(unit.components.health).toBeDefined()
+      })
+    })
+
+    it('should ensure player starts with empty inventory', () => {
+      const playerInventory = PLAYER_BLUEPRINT.components.inventory
+
+      expect(playerInventory.items).toBeDefined()
+      expect(Array.isArray(playerInventory.items)).toBe(true)
+      expect(playerInventory.items.length).toBe(0)
+    })
+
+    it('should provide reasonable stat progression starting values', () => {
+      const playerStats = PLAYER_BLUEPRINT.components.stats
+
+      expect(playerStats.level).toBe(1)
+      expect(playerStats.experience).toBe(0)
+      expect(playerStats.experienceToNextLevel).toBeGreaterThan(playerStats.experience)
+    })
+
+    it('should have all blueprints contain required rendering info', () => {
+      Object.values(ENTITY_BLUEPRINTS).forEach(blueprint => {
+        const renderable = blueprint.components.renderable
+        expect(renderable).toBeDefined()
+        expect(renderable.type).toBeDefined()
+        expect(renderable.color).toBeDefined()
+
+        // Color should be valid hex
+        expect(renderable.color).toMatch(/^#[0-9A-Fa-f]{6}$/)
+      })
+    })
+
+    it('should support blueprint cloning with deep copy behavior', () => {
+      const original = PLAYER_BLUEPRINT
+      const clone1 = createEntityFromBlueprint(original, {})
+      const clone2 = createEntityFromBlueprint(original, {})
+
+      // Both clones should equal original
+      expect(clone1.id).toBe(clone2.id)
+      expect(clone1.name).toBe(clone2.name)
+
+      // But modifying clone shouldn't affect original or other clone
+      clone1.components.health.max = 999
+      expect(clone2.components.health.max).toBe(PLAYER_BLUEPRINT.components.health.max)
+    })
+  })
 })
 
