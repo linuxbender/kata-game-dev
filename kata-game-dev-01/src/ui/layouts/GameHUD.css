@@ -1,0 +1,103 @@
+/**
+ * GameHUD Layout Styles
+ * 
+ * Professional layered UI structure with proper z-index management
+ */
+
+/* Main container - full viewport */
+.game-hud-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+/* Base layer class */
+.game-hud-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Allow clicks to pass through by default */
+}
+
+/* Layer 1: Canvas - Game rendering (z-index: 0) */
+.game-hud-canvas {
+  z-index: 0;
+  background: #000;
+}
+
+.game-hud-canvas canvas {
+  display: block;
+  pointer-events: auto; /* Canvas should receive clicks for game interaction */
+}
+
+/* Layer 2: World UI - Entity health bars, labels (z-index: 10) */
+.game-hud-world-ui {
+  z-index: 10;
+}
+
+.game-hud-world-ui > * {
+  pointer-events: auto; /* World UI elements can be interactive */
+}
+
+/* Layer 3: HUD Bar - Player stats, hotbar (z-index: 20) */
+.game-hud-bar {
+  z-index: 20;
+}
+
+.game-hud-bar > * {
+  pointer-events: auto; /* HUD elements are interactive */
+}
+
+/* Layer 4: Overlays - Panels like inventory (z-index: 30) */
+.game-hud-overlays {
+  z-index: 30;
+}
+
+.game-hud-overlays > * {
+  pointer-events: auto; /* Overlay panels are interactive */
+}
+
+/* Layer 5: Modals - Dialogs, menus (z-index: 40) */
+.game-hud-modals {
+  z-index: 40;
+}
+
+.game-hud-modals > * {
+  pointer-events: auto; /* Modals are interactive */
+}
+
+/* Debug info - Highest layer (z-index: 50) */
+.game-hud-debug {
+  z-index: 50;
+}
+
+.game-hud-debug > * {
+  pointer-events: auto; /* Debug info can be interactive */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .game-hud-container {
+    /* Adjust for mobile if needed */
+  }
+}
+
+/* Fade-in animation for layers */
+.game-hud-layer {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
