@@ -13,11 +13,14 @@ import { useCanvas } from './hooks/useCanvas'
 import { useQuadConfig } from './contexts/QuadConfigContext'
 import { GameStateProvider } from './contexts/GameStateContext'
 import { HealthBar } from '@ui/components/HealthBar'
-import { pickupItem, consumeItem, dropItem } from '@game/GameActions'
+import { pickupItem, consumeItem, dropItem, startDialog, chooseDialogOption, endDialog, getDialogState } from '@game/GameActions'
 import { createItemInstance } from '@game/configs/ItemConfig'
+import { getDialogTree, getDialogNode } from '@game/configs/DialogConfig'
+import type { DialogNode } from '@game/configs/DialogConfig'
 import InventoryPanel from '@ui/components/InventoryPanel'
 import EquipmentPanel from '@ui/components/EquipmentPanel'
 import SaveLoadMenu from '@ui/components/SaveLoadMenu'
+import DialogBox from '@ui/components/DialogBox'
 import { WeaponSystem } from '@engine/systems/WeaponSystem'
 import ITEM_CATALOG from '@game/configs/ItemConfig'
 import { LevelManager } from '@game/LevelManager'
@@ -41,15 +44,23 @@ const App = () => {
   const [inventoryVersion, setInventoryVersion] = useState(0)
   const [saveLoadVisible, setSaveLoadVisible] = useState(false)
   
+  // Dialog system state
+  const [dialogVisible, setDialogVisible] = useState(false)
+  const [currentDialogNode, setCurrentDialogNode] = useState<DialogNode | null>(null)
+  const [currentDialogTreeId, setCurrentDialogTreeId] = useState<string | null>(null)
+  const [questFlags, setQuestFlags] = useState<Record<string, any>>({})
+  
   // Refs to track current state for keyboard handlers
   const inventoryVisibleRef = useRef(inventoryVisible)
   const equipmentVisibleRef = useRef(equipmentVisible)
   const saveLoadVisibleRef = useRef(saveLoadVisible)
+  const dialogVisibleRef = useRef(dialogVisible)
   
   // Keep refs in sync with state
   React.useEffect(() => { inventoryVisibleRef.current = inventoryVisible }, [inventoryVisible])
   React.useEffect(() => { equipmentVisibleRef.current = equipmentVisible }, [equipmentVisible])
   React.useEffect(() => { saveLoadVisibleRef.current = saveLoadVisible }, [saveLoadVisible])
+  React.useEffect(() => { dialogVisibleRef.current = dialogVisible }, [dialogVisible])
   
   // Level transition state
   const [transitionActive, setTransitionActive] = useState(false)
@@ -167,6 +178,65 @@ const App = () => {
       // Attach input system listeners
       inputSystem.attach()
 
+      // Canvas click handler for NPC interaction
+      const handleCanvasClick = (e: MouseEvent) => {
+        const w = worldRef.current
+        const p = playerRef.current
+        if (!w || p == null) return
+        
+        // Get canvas bounds and calculate world coordinates
+        const rect = canvas.getBoundingClientRect()
+        const clickX = e.clientX - rect.left
+        const clickY = e.clientY - rect.top
+        
+        // Get camera offset from render system
+        const playerTransform = w.getComponent(p, COMPONENTS.TRANSFORM)
+        if (!playerTransform) return
+        
+        // Convert screen coordinates to world coordinates (accounting for camera)
+        // Assuming camera is centered on player
+        const worldX = clickX - canvasSize.width / 2 + playerTransform.x
+        const worldY = clickY - canvasSize.height / 2 + playerTransform.y
+        
+        // Find NPCs in range of click (within 30 pixels)
+        const npcs = reactiveWorld.query(COMPONENTS.TRANSFORM, COMPONENTS.METADATA)
+          .filter(e => {
+            const metadata = e.comps[1]
+            return metadata.isNPC === true
+          })
+        
+        for (const npc of npcs) {
+          const npcTransform = npc.comps[0]
+          const dx = npcTransform.x - worldX
+          const dy = npcTransform.y - worldY
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          
+          if (dist < 30) {
+            // NPC clicked! Determine which dialog to show
+            // For now, all NPCs show merchant dialog
+            // TODO: Add dialog tree ID to NPC metadata
+            const dialogTreeId = 'merchant_dialog'
+            
+            if (startDialog(w, p, npc.entity, dialogTreeId)) {
+              const dialogTree = getDialogTree(dialogTreeId)
+              if (dialogTree) {
+                const startNode = dialogTree.nodes[dialogTree.startNodeId]
+                setCurrentDialogNode(startNode)
+                setCurrentDialogTreeId(dialogTreeId)
+                setDialogVisible(true)
+                
+                // Update quest flags from player component
+                const flags = w.getComponent(p, COMPONENTS.QUEST_FLAGS) as Record<string, any> || {}
+                setQuestFlags(flags)
+              }
+            }
+            break
+          }
+        }
+      }
+      
+      canvas.addEventListener('click', handleCanvasClick)
+
       // Track last debug toggle state to detect changes
       let lastDebugState = false
 
@@ -215,7 +285,14 @@ const App = () => {
         if (e.key === 'Escape') {
           e.preventDefault()
           // Close overlays in order of priority (modals first, then overlays)
-          if (saveLoadVisibleRef.current) {
+          if (dialogVisibleRef.current) {
+            setDialogVisible(false)
+            const w = worldRef.current
+            const p = playerRef.current
+            if (w && p != null) {
+              endDialog(w, p)
+            }
+          } else if (saveLoadVisibleRef.current) {
             setSaveLoadVisible(false)
           } else if (inventoryVisibleRef.current) {
             setInventoryVisible(false)
@@ -351,6 +428,7 @@ const App = () => {
       return () => {
         running = false
         inputSystem.detach()
+        canvas.removeEventListener('click', handleCanvasClick)
         window.removeEventListener('keydown', debugDamageKey)
         window.removeEventListener('keydown', inventoryKey)
         window.removeEventListener('keydown', equipmentKey)
@@ -444,6 +522,52 @@ const App = () => {
                   }}
                 />
               </div>
+            )}
+            {/* Dialog Box */}
+            {dialogVisible && currentDialogNode && currentDialogTreeId && (
+              <DialogBox
+                node={currentDialogNode}
+                questFlags={questFlags}
+                onChoiceSelected={(choiceIndex) => {
+                  const w = worldRef.current
+                  const p = playerRef.current
+                  if (!w || p == null) return
+                  
+                  if (chooseDialogOption(w, p, choiceIndex)) {
+                    const dialogState = getDialogState(w, p)
+                    
+                    if (!dialogState) {
+                      // Dialog ended
+                      setDialogVisible(false)
+                      setCurrentDialogNode(null)
+                      setCurrentDialogTreeId(null)
+                    } else {
+                      // Navigate to next node
+                      const nextNode = getDialogNode(dialogState.treeId, dialogState.currentNodeId)
+                      if (nextNode) {
+                        setCurrentDialogNode(nextNode)
+                        
+                        // Update quest flags
+                        const flags = w.getComponent(p, COMPONENTS.QUEST_FLAGS) as Record<string, any> || {}
+                        setQuestFlags(flags)
+                        
+                        // Force inventory update in case items were given
+                        setInventoryVersion(v => v + 1)
+                      }
+                    }
+                  }
+                }}
+                onClose={() => {
+                  const w = worldRef.current
+                  const p = playerRef.current
+                  if (w && p != null) {
+                    endDialog(w, p)
+                  }
+                  setDialogVisible(false)
+                  setCurrentDialogNode(null)
+                  setCurrentDialogTreeId(null)
+                }}
+              />
             )}
           </>
         }
