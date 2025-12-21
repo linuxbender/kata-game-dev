@@ -10,6 +10,8 @@ export default defineConfig({
       '@engine': '/src/engine',
       '@game': '/src/game',
       '@ui': '/src/ui',
+      '@hooks': '/src/hooks',
+      '@contexts': '/src/contexts',
       '@components': '/src/engine/components',
       '@components$': '/src/engine/components/index.ts'
     }

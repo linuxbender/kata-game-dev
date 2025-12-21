@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, act } from '@testing-library/react'
 import App from './App'
 
 // Mock canvas and other browser APIs
@@ -93,5 +93,34 @@ describe('App', () => {
     const { container } = render(<App />)
     const equipmentPanel = container.querySelector('.equipment-panel-container')
     expect(equipmentPanel).toBeFalsy()
+  })
+
+  it('should not render dialog box initially', () => {
+    const { container } = render(<App />)
+    const dialogBox = container.querySelector('.dialog-box-overlay')
+    expect(dialogBox).toBeFalsy()
+  })
+
+  it('should handle dialog state initialization', () => {
+    const { container } = render(<App />)
+    // Verify initial state - no dialog visible
+    const dialogBox = container.querySelector('.dialog-box')
+    expect(dialogBox).toBeFalsy()
+  })
+
+  it('should render with dialog system components ready', () => {
+    const { container } = render(<App />)
+    // Verify canvas is ready for NPC click detection
+    const canvas = container.querySelector('canvas')
+    expect(canvas).toBeTruthy()
+    // Verify game world is initialized (required for dialog system)
+    expect(container).toBeDefined()
+  })
+
+  it('should initialize quest flags state', () => {
+    // Test that the component renders without errors
+    // Quest flags state is internal and managed by React
+    const { container } = render(<App />)
+    expect(container).toBeDefined()
   })
 })

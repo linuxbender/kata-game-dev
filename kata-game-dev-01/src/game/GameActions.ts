@@ -1,9 +1,9 @@
 import type { World } from '@engine/ECS'
 import { COMPONENTS } from '@engine/constants'
-import type { InventoryItem } from './configs/ItemConfig'
-import { getItemDefinition, createItemInstance } from './configs/ItemConfig'
-import { getDialogTree, getDialogNode } from './configs/DialogConfig'
-import type { DialogConsequence } from './configs/DialogConfig'
+import type { InventoryItem } from '@game/configs/ItemConfig'
+import { getItemDefinition, createItemInstance } from '@game/configs/ItemConfig'
+import { getDialogTree, getDialogNode } from '@game/configs/DialogConfig'
+import type { DialogConsequence } from '@game/configs/DialogConfig'
 import EquipmentSystem from '@engine/systems/EquipmentSystem'
 import { WeaponSystem } from '@engine/systems/WeaponSystem'
 
