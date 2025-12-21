@@ -112,9 +112,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
           <div className="settings-section">
             <h3>Graphics</h3>
             <div className="settings-group">
-              <label className="setting-item">
+              <label className="setting-item" htmlFor="graphics-quality">
                 <span className="setting-label">Quality</span>
                 <select
+                  id="graphics-quality"
                   value={settings.graphics.quality}
                   onChange={(e) => updateSettings({
                     graphics: { ...settings.graphics, quality: e.target.value as GraphicsQuality }
@@ -177,9 +178,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
           <div className="settings-section">
             <h3>Gameplay</h3>
             <div className="settings-group">
-              <label className="setting-item">
+              <label className="setting-item" htmlFor="gameplay-difficulty">
                 <span className="setting-label">Difficulty</span>
                 <select
+                  id="gameplay-difficulty"
                   value={settings.gameplay.difficulty}
                   onChange={(e) => updateSettings({
                     gameplay: { ...settings.gameplay, difficulty: e.target.value as DifficultyLevel }
@@ -203,9 +205,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                 />
               </label>
 
-              <label className="setting-item">
+              <label className="setting-item" htmlFor="autosave-interval">
                 <span className="setting-label">Auto-Save Interval</span>
                 <input
+                  id="autosave-interval"
                   type="number"
                   min="60"
                   max="3600"
