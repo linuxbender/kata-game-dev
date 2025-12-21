@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import './App.css'
 import { createWorld } from '@game/setupWorld'
 import { createMovementSystem } from '@engine/systems/MovementSystem'
 import { createEnemyAISystem } from '@engine/systems/EnemyAISystem'
@@ -18,12 +19,15 @@ import InventoryPanel from './ui/components/InventoryPanel'
 import EquipmentPanel from './ui/components/EquipmentPanel'
 import { WeaponSystem } from '@engine/systems/WeaponSystem'
 import ITEM_CATALOG from '@game/configs/ItemConfig'
+import { LevelManager } from '@game/LevelManager'
+import { LevelTransition } from './ui/components/LevelTransition'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
   const { canvasRef, ready, dpr, canvasSize } = useCanvas()
   const worldRef = useRef<ReactiveWorld | null>(null)
   const playerRef = useRef<number | null>(null)
+  const levelManagerRef = useRef<LevelManager | null>(null)
 
   // State for GameStateProvider
   const [gameWorld, setGameWorld] = useState<ReactiveWorld | null>(null)
@@ -31,6 +35,10 @@ const App = () => {
   const [inventoryVisible, setInventoryVisible] = useState(false)
   const [equipmentVisible, setEquipmentVisible] = useState(false)
   const [inventoryVersion, setInventoryVersion] = useState(0)
+  
+  // Level transition state
+  const [transitionActive, setTransitionActive] = useState(false)
+  const [transitionLevel, setTransitionLevel] = useState<{ name: string; description: string } | null>(null)
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
@@ -54,6 +62,14 @@ const App = () => {
       // Set state for GameStateProvider
       setGameWorld(reactiveWorld)
       setGamePlayerId(player)
+
+      // Initialize Level Manager
+      const levelManager = new LevelManager(reactiveWorld)
+      levelManager.setPlayer(player)
+      levelManagerRef.current = levelManager
+
+      // Load initial level (Forest Clearing)
+      levelManager.loadLevel('level_1_forest')
 
       const { update: movementUpdate } = createMovementSystem()
       const { update: enemyAIUpdate } = createEnemyAISystem()
@@ -172,9 +188,38 @@ const App = () => {
         if (key === 'e') setEquipmentVisible(v => !v)
         if (key === 'escape') setEquipmentVisible(false)
       }
+      
+      // Level switching keys: 1, 2, 3 for different levels
+      const levelSwitchKey = (e: KeyboardEvent) => {
+        const key = e.key
+        const lm = levelManagerRef.current
+        if (!lm) return
+        
+        const levelMap: Record<string, { id: string; name: string; description: string }> = {
+          '1': { id: 'level_1_forest', name: 'Forest Clearing', description: 'A peaceful forest with scattered goblin scouts' },
+          '2': { id: 'level_2_cave', name: 'Dark Cave', description: 'A dangerous cave filled with goblins and orcs' },
+          '3': { id: 'level_3_fortress', name: 'Orc Fortress', description: 'A heavily fortified orc stronghold' }
+        }
+        
+        const levelInfo = levelMap[key]
+        if (levelInfo) {
+          // Trigger transition
+          setTransitionLevel({ name: levelInfo.name, description: levelInfo.description })
+          setTransitionActive(true)
+          
+          // Load level after brief delay to show transition
+          setTimeout(() => {
+            lm.transitionToLevel(levelInfo.id, () => {
+              console.log(`[App] Level transition to ${levelInfo.name} complete`)
+            })
+          }, 400)
+        }
+      }
+      
       window.addEventListener('keydown', debugDamageKey)
       window.addEventListener('keydown', inventoryKey)
       window.addEventListener('keydown', equipmentKey)
+      window.addEventListener('keydown', levelSwitchKey)
 
       let last = performance.now()
       let running = true
@@ -271,6 +316,7 @@ const App = () => {
         window.removeEventListener('keydown', debugDamageKey)
         window.removeEventListener('keydown', inventoryKey)
         window.removeEventListener('keydown', equipmentKey)
+        window.removeEventListener('keydown', levelSwitchKey)
         unsubscribe()
         unsubInv()
       }
@@ -286,36 +332,18 @@ const App = () => {
   return (
     <GameStateProvider world={gameWorld} playerId={gamePlayerId}>
       {/* Main game container */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          overflow: 'hidden',
-          backgroundColor: '#000',
-        }}
-      >
+      <div className="app-container">
         {/* Canvas - now uses fixed positioning from useCanvas */}
         <canvas ref={canvasRef} />
 
         {/* React-based HealthBar overlay (single source of truth) */}
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '20px',
-            zIndex: 1000,
-            pointerEvents: 'none',
-          }}
-        >
+        <div className="health-bar-overlay">
           <HealthBar entity={gamePlayerId} width={250} height={35} />
         </div>
 
         {/* Inventory Panel - small fixed panel (no fullscreen backdrop) */}
         {inventoryVisible && (
-          <div style={{ position: 'fixed', top: '80px', left: '20px', zIndex: 1002, pointerEvents: 'auto' }}>
+          <div className="inventory-panel-container">
             <InventoryPanel
               onClose={() => setInventoryVisible(false)}
               items={
@@ -340,7 +368,7 @@ const App = () => {
         )}
         {/* Equipment Panel - right next to InventoryPanel */}
         {equipmentVisible && (
-          <div style={{ position: 'fixed', top: '80px', left: '340px', zIndex: 1002, pointerEvents: 'auto' }}>
+          <div className="equipment-panel-container">
             <EquipmentPanel
               equipment={
                 (gameWorld && gamePlayerId != null)
@@ -376,26 +404,15 @@ const App = () => {
         )}
 
         {/* Debug info */}
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            left: '20px',
-            zIndex: 1001,
-            color: '#0f0',
-            fontSize: '12px',
-            fontFamily: 'monospace',
-            pointerEvents: 'none',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            padding: '8px 12px',
-            borderRadius: '4px',
-          }}
-        >
+        <div className="debug-info">
           <div>World: {gameWorld ? '✓' : '✗'}</div>
           <div>Player: {gamePlayerId ? '✓' : '✗'}</div>
           <div>Ready: {ready ? '✓' : '✗'}</div>
+          <div className="debug-info-hotkeys">
+            Level Hotkeys: 1 (Forest), 2 (Cave), 3 (Fortress)
+          </div>
           {/* Debug buttons (pointerEvents enabled) */}
-          <div style={{ marginTop: 8, pointerEvents: 'auto', display: 'flex', gap: 8 }}>
+          <div className="debug-buttons">
             <button onClick={() => {
                const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.max(0, hp.current - 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
              }}>Damage -10</button>
@@ -410,6 +427,18 @@ const App = () => {
             <button onClick={() => setInventoryVisible(v => !v)}>Toggle Inventory (I)</button>
            </div>
          </div>
+         
+         {/* Level Transition Overlay */}
+         <LevelTransition
+           isActive={transitionActive}
+           levelName={transitionLevel?.name}
+           levelDescription={transitionLevel?.description}
+           duration={2000}
+           onComplete={() => {
+             setTransitionActive(false)
+             setTransitionLevel(null)
+           }}
+         />
       </div>
     </GameStateProvider>
   )
