@@ -195,19 +195,17 @@ const App = () => {
       }
       const inventoryKey = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase()
-        // Toggle inventory with Ctrl+I or just I
-        if (key === 'i' && (e.ctrlKey || !e.ctrlKey)) setInventoryVisible(v => !v)
+        if (key === 'i') setInventoryVisible(v => !v)
       }
       const equipmentKey = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase()
-        // Toggle equipment with Ctrl+E or just E
-        if (key === 'e' && (e.ctrlKey || !e.ctrlKey)) setEquipmentVisible(v => !v)
+        if (key === 'e') setEquipmentVisible(v => !v)
       }
       
-      // Save/Load menu hotkey (Ctrl+S or just S)
+      // Save/Load menu hotkey
       const saveLoadKey = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase()
-        if (key === 's' && (e.ctrlKey || !e.ctrlKey)) {
+        if (key === 's') {
           setSaveLoadVisible(v => !v)
         }
       }
