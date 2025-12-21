@@ -52,9 +52,9 @@ describe('App', () => {
     expect(canvas).toBeTruthy()
   })
 
-  it('should render game container with correct class', () => {
+  it('should render game HUD container with correct class', () => {
     const { container } = render(<App />)
-    const gameContainer = container.querySelector('.app-container')
+    const gameContainer = container.querySelector('.game-hud-container')
     expect(gameContainer).toBeTruthy()
   })
 

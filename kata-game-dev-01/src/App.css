@@ -57,4 +57,63 @@
   pointer-events: auto;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.debug-buttons button {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: rgba(0, 255, 0, 0.2);
+  border: 1px solid #0f0;
+  color: #0f0;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.debug-buttons button:hover {
+  background: rgba(0, 255, 0, 0.3);
+}
+
+/* Fade-in animation for overlays */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .equipment-panel-container {
+    left: 20px;
+    top: 400px;
+  }
+}
+
+@media (max-width: 480px) {
+  .health-bar-overlay {
+    top: 10px;
+    left: 10px;
+  }
+  
+  .inventory-panel-container,
+  .equipment-panel-container {
+    left: 10px;
+    right: 10px;
+    width: calc(100% - 20px);
+  }
+  
+  .debug-info {
+    bottom: 80px; /* Above HUD bar on mobile */
+    font-size: 10px;
+  }
 }

@@ -23,6 +23,8 @@ import ITEM_CATALOG from '@game/configs/ItemConfig'
 import { LevelManager } from '@game/LevelManager'
 import { LevelTransition } from '@ui/components/LevelTransition'
 import { saveGame, loadGame } from '@game/SaveSystem'
+import GameHUD from '@ui/layouts/GameHUD'
+import HUDBar from '@ui/components/HUDBar'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
@@ -38,6 +40,16 @@ const App = () => {
   const [equipmentVisible, setEquipmentVisible] = useState(false)
   const [inventoryVersion, setInventoryVersion] = useState(0)
   const [saveLoadVisible, setSaveLoadVisible] = useState(false)
+  
+  // Refs to track current state for keyboard handlers
+  const inventoryVisibleRef = useRef(inventoryVisible)
+  const equipmentVisibleRef = useRef(equipmentVisible)
+  const saveLoadVisibleRef = useRef(saveLoadVisible)
+  
+  // Keep refs in sync with state
+  React.useEffect(() => { inventoryVisibleRef.current = inventoryVisible }, [inventoryVisible])
+  React.useEffect(() => { equipmentVisibleRef.current = equipmentVisible }, [equipmentVisible])
+  React.useEffect(() => { saveLoadVisibleRef.current = saveLoadVisible }, [saveLoadVisible])
   
   // Level transition state
   const [transitionActive, setTransitionActive] = useState(false)
@@ -184,12 +196,10 @@ const App = () => {
       const inventoryKey = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase()
         if (key === 'i') setInventoryVisible(v => !v)
-        if (key === 'escape') setInventoryVisible(false)
       }
       const equipmentKey = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase()
         if (key === 'e') setEquipmentVisible(v => !v)
-        if (key === 'escape') setEquipmentVisible(false)
       }
       
       // Save/Load menu hotkey
@@ -198,8 +208,20 @@ const App = () => {
         if (key === 's') {
           setSaveLoadVisible(v => !v)
         }
-        if (key === 'escape') {
-          setSaveLoadVisible(false)
+      }
+      
+      // ESC key handler to close all overlays/modals
+      const escapeKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          // Close overlays in order of priority (modals first, then overlays)
+          if (saveLoadVisibleRef.current) {
+            setSaveLoadVisible(false)
+          } else if (inventoryVisibleRef.current) {
+            setInventoryVisible(false)
+          } else if (equipmentVisibleRef.current) {
+            setEquipmentVisible(false)
+          }
         }
       }
       
@@ -234,6 +256,7 @@ const App = () => {
       window.addEventListener('keydown', inventoryKey)
       window.addEventListener('keydown', equipmentKey)
       window.addEventListener('keydown', saveLoadKey)
+      window.addEventListener('keydown', escapeKey)
       window.addEventListener('keydown', levelSwitchKey)
 
       let last = performance.now()
@@ -332,6 +355,7 @@ const App = () => {
         window.removeEventListener('keydown', inventoryKey)
         window.removeEventListener('keydown', equipmentKey)
         window.removeEventListener('keydown', saveLoadKey)
+        window.removeEventListener('keydown', escapeKey)
         window.removeEventListener('keydown', levelSwitchKey)
         unsubscribe()
         unsubInv()
@@ -347,154 +371,159 @@ const App = () => {
 
   return (
     <GameStateProvider world={gameWorld} playerId={gamePlayerId}>
-      {/* Main game container */}
-      <div className="app-container">
-        {/* Canvas - now uses fixed positioning from useCanvas */}
-        <canvas ref={canvasRef} />
-
-        {/* React-based HealthBar overlay (single source of truth) */}
-        <div className="health-bar-overlay">
-          <HealthBar entity={gamePlayerId} width={250} height={35} />
-        </div>
-
-        {/* Inventory Panel - small fixed panel (no fullscreen backdrop) */}
-        {inventoryVisible && (
-          <div className="inventory-panel-container">
-            <InventoryPanel
-              onClose={() => setInventoryVisible(false)}
-              items={
-                (gameWorld && gamePlayerId != null) ? ((gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY) as any[]) || []) : []
-              }
-              key={inventoryVersion}
-              onUse={(it) => {
-                const w = worldRef.current
-                const p = playerRef.current
-                if (!w || p == null) return
-                // call consumeItem which applies effects and decrements quantity
-                consumeItem(w as any, p, it.uid)
-              }}
-              onDrop={(it) => {
-                const w = worldRef.current
-                const p = playerRef.current
-                if (!w || p == null) return
-                dropItem(w as any, p, it.uid, 1)
-              }}
-            />
+      <GameHUD
+        canvas={<canvas ref={canvasRef} />}
+        worldUI={
+          <div className="health-bar-overlay">
+            <HealthBar entity={gamePlayerId} width={250} height={35} />
           </div>
-        )}
-        {/* Equipment Panel - right next to InventoryPanel */}
-        {equipmentVisible && (
-          <div className="equipment-panel-container">
-            <EquipmentPanel
-              equipment={
-                (gameWorld && gamePlayerId != null)
-                  ? ((gameWorld.getComponent(gamePlayerId, COMPONENTS.EQUIPMENT)?.slots) || {})
-                  : {}
-              }
-              items={
-                (gameWorld && gamePlayerId != null)
-                  ? (Array.isArray(gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY))
-                      ? (gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY) as any[])
-                      : []
-                    ).reduce((acc, it) => { acc[it.uid] = it; return acc }, {} as Record<string, any>)
-                  : {}
-              }
-              onUnequip={(slot) => {
-                const w = worldRef.current
-                const p = playerRef.current
-                if (!w || p == null) return
-                // Get equipment and inventory
-                const equipment = w.getComponent(p, COMPONENTS.EQUIPMENT)
-                if (!equipment || !equipment.slots) return
-                const uid = equipment.slots[slot]
-                if (!uid) return
-                // Clear slot
-                const newSlots = { ...equipment.slots }
-                delete newSlots[slot]
-                w.addComponent(p, COMPONENTS.EQUIPMENT, { slots: newSlots })
-                // (Optional) Inventory update trigger (usually detected automatically)
-                setInventoryVersion(v => v + 1)
-              }}
-            />
-          </div>
-        )}
-        
-        {/* Save/Load Menu */}
-        {saveLoadVisible && (
-          <SaveLoadMenu
-            onClose={() => setSaveLoadVisible(false)}
-            onSave={(slot, name) => {
-              const w = worldRef.current
-              const p = playerRef.current
-              const lm = levelManagerRef.current
-              if (!w || p == null || !lm) return
-              const currentLevel = lm.getCurrentLevel()
-              const levelId = currentLevel?.id || 'unknown'
-              saveGame(w, p, levelId, slot, name)
-              console.log(`[App] Game saved to slot ${slot}`)
-            }}
-            onLoad={(slot) => {
-              const w = worldRef.current
-              const lm = levelManagerRef.current
-              if (!w || !lm) return
-              const saveData = loadGame(w, slot)
-              if (saveData) {
-                console.log(`[App] Game loaded from slot ${slot}`)
-                // Transition to the saved level
-                lm.transitionToLevel(saveData.levelId, () => {
-                  console.log(`[App] Level transition complete after load`)
-                })
-                // Update player ref if needed
-                if (saveData.playerData.entityId !== playerRef.current) {
-                  playerRef.current = saveData.playerData.entityId
-                  setGamePlayerId(saveData.playerData.entityId)
-                }
-              }
-            }}
-            currentLevelId={levelManagerRef.current?.getCurrentLevel()?.id}
+        }
+        hudBar={
+          <HUDBar 
+            playerId={gamePlayerId}
+            levelName={levelManagerRef.current?.getCurrentLevel()?.name}
+            showExperience={true}
+            showTime={true}
           />
-        )}
-
-        {/* Debug info */}
-        <div className="debug-info">
-          <div>World: {gameWorld ? '✓' : '✗'}</div>
-          <div>Player: {gamePlayerId ? '✓' : '✗'}</div>
-          <div>Ready: {ready ? '✓' : '✗'}</div>
-          <div className="debug-info-hotkeys">
-            Level Hotkeys: 1 (Forest), 2 (Cave), 3 (Fortress)
-          </div>
-          <div className="debug-info-hotkeys">
-            Save/Load: S
-          </div>
-          {/* Debug buttons (pointerEvents enabled) */}
-          <div className="debug-buttons">
-            <button onClick={() => {
-               const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.max(0, hp.current - 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
-             }}>Damage -10</button>
-            <button onClick={() => {
-               const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.min(hp.max, hp.current + 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
-             }}>Heal +10</button>
-            <button onClick={() => {
-              const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return;
-              const item = createItemInstance('potion_health', 1);
-              pickupItem(w as any, p, item);
-            }}>Pick Up</button>
-            <button onClick={() => setInventoryVisible(v => !v)}>Toggle Inventory (I)</button>
+        }
+        overlays={
+          <>
+            {/* Inventory Panel */}
+            {inventoryVisible && (
+              <div className="inventory-panel-container fade-in">
+                <InventoryPanel
+                  onClose={() => setInventoryVisible(false)}
+                  items={
+                    (gameWorld && gamePlayerId != null) ? ((gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY) as any[]) || []) : []
+                  }
+                  key={inventoryVersion}
+                  onUse={(it) => {
+                    const w = worldRef.current
+                    const p = playerRef.current
+                    if (!w || p == null) return
+                    consumeItem(w as any, p, it.uid)
+                  }}
+                  onDrop={(it) => {
+                    const w = worldRef.current
+                    const p = playerRef.current
+                    if (!w || p == null) return
+                    dropItem(w as any, p, it.uid, 1)
+                  }}
+                />
+              </div>
+            )}
+            {/* Equipment Panel */}
+            {equipmentVisible && (
+              <div className="equipment-panel-container fade-in">
+                <EquipmentPanel
+                  equipment={
+                    (gameWorld && gamePlayerId != null)
+                      ? ((gameWorld.getComponent(gamePlayerId, COMPONENTS.EQUIPMENT)?.slots) || {})
+                      : {}
+                  }
+                  items={
+                    (gameWorld && gamePlayerId != null)
+                      ? (Array.isArray(gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY))
+                          ? (gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY) as any[])
+                          : []
+                        ).reduce((acc, it) => { acc[it.uid] = it; return acc }, {} as Record<string, any>)
+                      : {}
+                  }
+                  onUnequip={(slot) => {
+                    const w = worldRef.current
+                    const p = playerRef.current
+                    if (!w || p == null) return
+                    const equipment = w.getComponent(p, COMPONENTS.EQUIPMENT)
+                    if (!equipment || !equipment.slots) return
+                    const uid = equipment.slots[slot]
+                    if (!uid) return
+                    const newSlots = { ...equipment.slots }
+                    delete newSlots[slot]
+                    w.addComponent(p, COMPONENTS.EQUIPMENT, { slots: newSlots })
+                    setInventoryVersion(v => v + 1)
+                  }}
+                />
+              </div>
+            )}
+          </>
+        }
+        modals={
+          <>
+            {/* Save/Load Menu */}
+            {saveLoadVisible && (
+              <SaveLoadMenu
+                onClose={() => setSaveLoadVisible(false)}
+                onSave={(slot, name) => {
+                  const w = worldRef.current
+                  const p = playerRef.current
+                  const lm = levelManagerRef.current
+                  if (!w || p == null || !lm) return
+                  const currentLevel = lm.getCurrentLevel()
+                  const levelId = currentLevel?.id || 'unknown'
+                  saveGame(w, p, levelId, slot, name)
+                  console.log(`[App] Game saved to slot ${slot}`)
+                }}
+                onLoad={(slot) => {
+                  const w = worldRef.current
+                  const lm = levelManagerRef.current
+                  if (!w || !lm) return
+                  const saveData = loadGame(w, slot)
+                  if (saveData) {
+                    console.log(`[App] Game loaded from slot ${slot}`)
+                    lm.transitionToLevel(saveData.levelId, () => {
+                      console.log(`[App] Level transition complete after load`)
+                    })
+                    if (saveData.playerData.entityId !== playerRef.current) {
+                      playerRef.current = saveData.playerData.entityId
+                      setGamePlayerId(saveData.playerData.entityId)
+                    }
+                  }
+                }}
+                currentLevelId={levelManagerRef.current?.getCurrentLevel()?.id}
+              />
+            )}
+            {/* Level Transition Overlay */}
+            <LevelTransition
+              isActive={transitionActive}
+              levelName={transitionLevel?.name}
+              levelDescription={transitionLevel?.description}
+              duration={2000}
+              onComplete={() => {
+                setTransitionActive(false)
+                setTransitionLevel(null)
+              }}
+            />
+          </>
+        }
+        debugInfo={
+          <div className="debug-info">
+            <div>World: {gameWorld ? '✓' : '✗'}</div>
+            <div>Player: {gamePlayerId ? '✓' : '✗'}</div>
+            <div>Ready: {ready ? '✓' : '✗'}</div>
+            <div className="debug-info-hotkeys">
+              Level Hotkeys: 1 (Forest), 2 (Cave), 3 (Fortress)
+            </div>
+            <div className="debug-info-hotkeys">
+              Hotkeys: I (Inventory), E (Equipment), S (Save/Load), ESC (Close)
+            </div>
+            {/* Debug buttons (pointerEvents enabled) */}
+            <div className="debug-buttons">
+              <button onClick={() => {
+                 const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.max(0, hp.current - 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
+               }}>Damage -10</button>
+              <button onClick={() => {
+                 const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.min(hp.max, hp.current + 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
+               }}>Heal +10</button>
+              <button onClick={() => {
+                const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return;
+                const item = createItemInstance('potion_health', 1);
+                pickupItem(w as any, p, item);
+              }}>Pick Up</button>
+              <button onClick={() => setInventoryVisible(v => !v)}>Toggle Inventory (I)</button>
+             </div>
            </div>
-         </div>
-         
-         {/* Level Transition Overlay */}
-         <LevelTransition
-           isActive={transitionActive}
-           levelName={transitionLevel?.name}
-           levelDescription={transitionLevel?.description}
-           duration={2000}
-           onComplete={() => {
-             setTransitionActive(false)
-             setTransitionLevel(null)
-           }}
-         />
-      </div>
+        }
+      />
     </GameStateProvider>
   )
 }
