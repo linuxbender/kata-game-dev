@@ -165,10 +165,12 @@ export const createPerformanceMonitor = (sampleSize: number = 60): PerformanceMo
    * Get memory usage if available (in MB)
    */
   const getMemoryUsage = (): number | undefined => {
-    // @ts-ignore - performance.memory is not standard
-    if (performance.memory) {
-      // @ts-ignore
-      return Math.round(performance.memory.usedJSHeapSize / 1024 / 1024 * 100) / 100
+    // Check if performance.memory is available (non-standard Chrome feature)
+    if ('memory' in performance && (performance as any).memory) {
+      const memory = (performance as any).memory
+      if (memory && typeof memory.usedJSHeapSize === 'number') {
+        return Math.round(memory.usedJSHeapSize / 1024 / 1024 * 100) / 100
+      }
     }
     return undefined
   }

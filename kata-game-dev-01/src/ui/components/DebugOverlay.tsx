@@ -273,17 +273,17 @@ export const DebugOverlay: React.FC<DebugOverlayProps> = ({
             )}
             {metrics.frameTime < 20 && (
               <div className="report-item report-good">
-                ✓ Frame time is excellent (&lt;20ms)
+                ✓ Frame time is excellent ({'<'}20ms)
               </div>
             )}
             {metrics.frameTime >= 33 && (
               <div className="report-item report-warning">
-                ⚠ Frame time is high (&gt;33ms)
+                ⚠ Frame time is high ({'>'}33ms)
               </div>
             )}
             {metrics.frameTime >= 50 && (
               <div className="report-item report-bad">
-                ✗ Frame time is too high (&gt;50ms)
+                ✗ Frame time is too high ({'>'}50ms)
               </div>
             )}
           </div>

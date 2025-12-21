@@ -81,10 +81,6 @@ const App = () => {
     systemTimings: [],
     totalFrames: 0
   })
-  const debugOverlayVisibleRef = useRef(debugOverlayVisible)
-
-  // Keep debug overlay ref in sync
-  React.useEffect(() => { debugOverlayVisibleRef.current = debugOverlayVisible }, [debugOverlayVisible])
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
