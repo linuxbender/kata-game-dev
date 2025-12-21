@@ -71,6 +71,57 @@ localStorage.removeItem('kata_quadtree_config_v1')
 - S / ArrowDown: move down
 - A / ArrowLeft: move left
 - D / ArrowRight: move right
+- I: toggle inventory panel
+- E: toggle equipment panel
+- ESC: close any open panel
+- D: toggle debug performance overlay
+- Shift+D: toggle debug quadtree visualization
+- H: damage player (debug)
+- J: heal player (debug)
+- 1, 2, 3: switch between levels
+
+## Phase 10: Polish & Optimization
+
+### Performance Monitoring
+- **PerformanceMonitor** (`src/debug/PerformanceMonitor.ts`): Comprehensive performance tracking system
+  - FPS counter with average, min, max tracking
+  - Frame time monitoring
+  - Entity count tracking
+  - System timing breakdown (input, movement, AI, render)
+  - Memory usage monitoring (when available)
+  - QuadTree statistics integration
+  
+### Debug Overlay
+- **DebugOverlay UI** (`src/ui/components/DebugOverlay.tsx`): Real-time performance display
+  - Toggle with 'D' key
+  - Shows FPS and frame time metrics
+  - Displays entity count
+  - System timing visualization with percentages
+  - Memory usage display
+  - QuadTree statistics
+  - Performance report with status indicators
+  - Color-coded warnings for performance issues
+
+### Settings System
+- **SettingsContext** (`src/contexts/SettingsContext.tsx`): Centralized game settings management
+  - **Audio Settings**: Master volume, music volume, SFX volume, audio enable/disable
+  - **Graphics Settings**: Quality presets (low/medium/high/ultra), FPS display, particle effects, screen shake, VSync
+  - **Gameplay Settings**: Difficulty levels (easy/normal/hard/extreme), auto-save, auto-save interval, tutorial hints
+  - **Accessibility Settings**: Colorblind mode, reduce motion, large text, high contrast
+  - Settings persist to localStorage automatically
+  - Reset to defaults functionality
+  
+- **SettingsPanel UI** (`src/ui/components/SettingsPanel.tsx`): User-friendly settings interface
+  - Clean, organized layout
+  - Real-time setting updates
+  - Visual feedback for all controls
+  - Mobile-responsive design
+
+### Performance Optimizations
+- System timing tracking integrated into game loop
+- Throttled React state updates (metrics update every 10 frames)
+- Efficient QuadTree metrics collection
+- Minimal re-renders through React context optimization
 
 ## Development environment
 

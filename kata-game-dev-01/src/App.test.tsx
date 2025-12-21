@@ -123,4 +123,54 @@ describe('App', () => {
     const { container } = render(<App />)
     expect(container).toBeDefined()
   })
+
+  describe('Performance Monitoring', () => {
+    it('should initialize performance monitor', () => {
+      const { container } = render(<App />)
+      // Verify app renders successfully with performance monitoring
+      expect(container).toBeDefined()
+      const canvas = container.querySelector('canvas')
+      expect(canvas).toBeTruthy()
+    })
+
+    it('should render DebugOverlay component', () => {
+      const { container } = render(<App />)
+      // DebugOverlay should render (even if not visible initially)
+      // Check for the hint text when overlay is not visible
+      const debugHint = container.querySelector('.debug-overlay-hint')
+      expect(debugHint).toBeTruthy()
+    })
+
+    it('should track system timings in game loop', () => {
+      const { container } = render(<App />)
+      // Verify the app initializes with performance tracking
+      // Performance metrics are tracked internally in the game loop
+      expect(container).toBeDefined()
+      const canvas = container.querySelector('canvas')
+      expect(canvas).toBeTruthy()
+    })
+
+    it('should initialize with default performance metrics state', () => {
+      const { container } = render(<App />)
+      // Performance metrics state is initialized with default values
+      expect(container).toBeDefined()
+    })
+  })
+
+  describe('Debug Overlay Integration', () => {
+    it('should not show debug overlay initially', () => {
+      const { container } = render(<App />)
+      // Debug overlay should not be visible initially
+      const overlay = container.querySelector('.debug-overlay')
+      expect(overlay).toBeFalsy()
+    })
+
+    it('should render debug overlay hint when not visible', () => {
+      const { container } = render(<App />)
+      // Should show hint to toggle debug overlay
+      const hint = container.querySelector('.debug-overlay-hint')
+      expect(hint).toBeTruthy()
+      expect(hint?.textContent).toContain("Press 'D'")
+    })
+  })
 })

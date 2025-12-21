@@ -6,7 +6,6 @@ import { createEnemyAISystem } from '@engine/systems/EnemyAISystem'
 import { createRenderSystem } from '@engine/systems/RenderSystem'
 import { createInputSystem, INPUT_ACTIONS } from '@engine/systems/InputSystem'
 import { createQuadTree } from '@engine/spatial/QuadTree'
-import { createDebugOverlay } from '@engine/systems/DebugOverlay'
 import { ReactiveWorld } from '@engine/ReactiveWorld'
 import { COMPONENTS, EVENT_TYPES } from '@engine/constants'
 import { useCanvas } from '@hooks/useCanvas'
@@ -28,6 +27,8 @@ import { LevelTransition } from '@ui/components/LevelTransition'
 import { saveGame, loadGame } from '@game/SaveSystem'
 import GameHUD from '@ui/layouts/GameHUD'
 import HUDBar from '@ui/components/HUDBar'
+import DebugOverlay from '@ui/components/DebugOverlay'
+import { createPerformanceMonitor, type PerformanceMetrics } from '@/debug/PerformanceMonitor'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
@@ -65,6 +66,20 @@ const App = () => {
   // Level transition state
   const [transitionActive, setTransitionActive] = useState(false)
   const [transitionLevel, setTransitionLevel] = useState<{ name: string; description: string } | null>(null)
+
+  // Performance monitoring state
+  const [debugOverlayVisible, setDebugOverlayVisible] = useState(false)
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
+    fps: 0,
+    avgFps: 0,
+    minFps: 0,
+    maxFps: 0,
+    frameTime: 0,
+    avgFrameTime: 0,
+    entityCount: 0,
+    systemTimings: [],
+    totalFrames: 0
+  })
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
@@ -121,9 +136,6 @@ const App = () => {
         }
       )
 
-      // Initialize debug overlay (toggle with Shift+D)
-      const debugOverlay = createDebugOverlay(canvas)
-
       // Initialize render system with smooth camera follow and spatial culling
       // NOTE: we no longer use a canvas-based HUD renderer; UI is React-based.
       const { update: renderUpdate } = createRenderSystem(canvas, player, {
@@ -133,7 +145,7 @@ const App = () => {
           deadZoneRadius: 3,
           lookAheadFactor: 0.2
         }
-      }, quad, debugOverlay)
+      }, quad)
 
       // Track entities in quad tree for incremental updates
       const trackedEntities = new Set<number>()
@@ -237,9 +249,6 @@ const App = () => {
       
       canvas.addEventListener('click', handleCanvasClick)
 
-      // Track last debug toggle state to detect changes
-      let lastDebugState = false
-
       // Debug keys: H = damage -10, J = heal +10, I = inventory toggle
       const debugDamageKey = (e: KeyboardEvent) => {
         const key = e.key.toLowerCase()
@@ -329,12 +338,21 @@ const App = () => {
         }
       }
       
+      // Debug overlay hotkey (D key)
+      const debugOverlayKey = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase()
+        if (key === 'd') {
+          setDebugOverlayVisible(v => !v)
+        }
+      }
+      
       window.addEventListener('keydown', debugDamageKey)
       window.addEventListener('keydown', inventoryKey)
       window.addEventListener('keydown', equipmentKey)
       window.addEventListener('keydown', saveLoadKey)
       window.addEventListener('keydown', escapeKey)
       window.addEventListener('keydown', levelSwitchKey)
+      window.addEventListener('keydown', debugOverlayKey)
 
       let last = performance.now()
       let running = true
@@ -342,8 +360,14 @@ const App = () => {
       // WeaponSystem initialization
       const weaponSystem = new WeaponSystem(reactiveWorld)
 
+      // Performance monitor initialization
+      const performanceMonitor = createPerformanceMonitor(60)
+
       // Main game loop frame
       const frame = (now: number) => {
+        // Start performance tracking
+        performanceMonitor.startFrame()
+
         const dt = Math.min((now - last) / 1000, 0.05)
         last = now
 
@@ -351,20 +375,19 @@ const App = () => {
         reactiveWorld.updateTime(dt)
 
         // Update input and player movement
+        let inputStart = performance.now()
         inputSystem.update(reactiveWorld, player, dt)
-
-        // Handle debug overlay toggle
-        const debugPressed = inputSystem.isActionPressed(INPUT_ACTIONS.DEBUG_TOGGLE)
-        if (debugPressed && !lastDebugState) {
-          debugOverlay.toggle()
-        }
-        lastDebugState = debugPressed
+        performanceMonitor.recordSystemTime('input', performance.now() - inputStart)
 
         // Update movement
+        let movementStart = performance.now()
         movementUpdate(reactiveWorld, dt)
+        performanceMonitor.recordSystemTime('movement', performance.now() - movementStart)
 
         // Update enemy AI (targeting, movement, attacks)
+        let aiStart = performance.now()
         enemyAIUpdate(reactiveWorld)
+        performanceMonitor.recordSystemTime('ai', performance.now() - aiStart)
 
         // --- WeaponSystem: Attack with space bar ---
         if (inputSystem.isActionPressed(INPUT_ACTIONS.ACTION_PRIMARY)) {
@@ -413,10 +436,22 @@ const App = () => {
         }
 
         // Render frame (pass quad for debug metrics)
+        let renderStart = performance.now()
         try {
           renderUpdate(reactiveWorld, dt, { width: canvasSize.width, height: canvasSize.height }, quad)
         } catch (renderError) {
           console.error('❌ [Frame] Render error:', renderError)
+        }
+        performanceMonitor.recordSystemTime('render', performance.now() - renderStart)
+
+        // End performance tracking and update metrics
+        const entityCount = reactiveWorld.query(COMPONENTS.TRANSFORM).length
+        const quadStats = quad.getMetrics()
+        performanceMonitor.endFrame(entityCount, quadStats)
+
+        // Update performance metrics state (throttle to every 10 frames to avoid excessive re-renders)
+        if (performanceMonitor.getMetrics().totalFrames % 10 === 0) {
+          setPerformanceMetrics(performanceMonitor.getMetrics())
         }
 
         if (running) requestAnimationFrame(frame)
@@ -435,6 +470,7 @@ const App = () => {
         window.removeEventListener('keydown', saveLoadKey)
         window.removeEventListener('keydown', escapeKey)
         window.removeEventListener('keydown', levelSwitchKey)
+        window.removeEventListener('keydown', debugOverlayKey)
         unsubscribe()
         unsubInv()
       }
@@ -569,6 +605,12 @@ const App = () => {
                 }}
               />
             )}
+            {/* Debug Overlay */}
+            <DebugOverlay
+              metrics={performanceMetrics}
+              isVisible={debugOverlayVisible}
+              onToggle={() => setDebugOverlayVisible(v => !v)}
+            />
           </>
         }
         modals={
