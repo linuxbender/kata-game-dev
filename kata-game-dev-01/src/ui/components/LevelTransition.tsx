@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import './LevelTransition.css'
 
 export interface LevelTransitionProps {
   /** Whether transition is active */
@@ -88,47 +89,19 @@ export const LevelTransition: React.FC<LevelTransitionProps> = ({
 
   return (
     <div
+      className="level-transition-overlay"
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.95)',
         opacity,
-        transition: `opacity ${transitionDuration} ease-in-out`,
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        pointerEvents: 'none'
+        transition: `opacity ${transitionDuration} ease-in-out`
       }}
     >
       {levelName && (
-        <div
-          style={{
-            fontSize: '48px',
-            fontWeight: 'bold',
-            color: '#ffffff',
-            marginBottom: '20px',
-            textAlign: 'center',
-            textShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
-          }}
-        >
+        <div className="level-transition-title">
           {levelName}
         </div>
       )}
       {levelDescription && (
-        <div
-          style={{
-            fontSize: '20px',
-            color: '#cccccc',
-            textAlign: 'center',
-            maxWidth: '600px',
-            padding: '0 20px'
-          }}
-        >
+        <div className="level-transition-description">
           {levelDescription}
         </div>
       )}

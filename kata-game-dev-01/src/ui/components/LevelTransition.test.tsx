@@ -128,19 +128,19 @@ describe('LevelTransition', () => {
     expect(screen.getByText('Test Level')).toBeTruthy()
   })
 
-  it('should have correct z-index for overlay', () => {
+  it('should have correct className for overlay', () => {
     const { container } = render(
       <LevelTransition isActive={true} levelName="Test Level" />
     )
     const overlay = container.firstChild as HTMLElement
-    expect(overlay.style.zIndex).toBe('9999')
+    expect(overlay.className).toBe('level-transition-overlay')
   })
 
-  it('should have pointer-events none to not block interactions after fade', () => {
+  it('should apply opacity transition style', () => {
     const { container } = render(
       <LevelTransition isActive={true} levelName="Test Level" />
     )
     const overlay = container.firstChild as HTMLElement
-    expect(overlay.style.pointerEvents).toBe('none')
+    expect(overlay.style.transition).toContain('opacity')
   })
 })

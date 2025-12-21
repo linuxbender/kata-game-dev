@@ -259,7 +259,7 @@ export const LEVELS: Record<string, LevelDefinition> = {
  * }
  * ```
  */
-export function getLevelById(id: string): LevelDefinition | undefined {
+export const getLevelById = (id: string): LevelDefinition | undefined => {
   return LEVELS[id]
 }
 
@@ -274,7 +274,7 @@ export function getLevelById(id: string): LevelDefinition | undefined {
  * // ['level_1_forest', 'level_2_cave', 'level_3_fortress']
  * ```
  */
-export function getAllLevelIds(): string[] {
+export const getAllLevelIds = (): string[] => {
   return Object.keys(LEVELS)
 }
 
@@ -291,7 +291,7 @@ export function getAllLevelIds(): string[] {
  * }
  * ```
  */
-export function isValidLevel(level: LevelDefinition): boolean {
+export const isValidLevel = (level: LevelDefinition): boolean => {
   if (!level.id || !level.name || !level.description) return false
   if (!Array.isArray(level.enemies)) return false
   if (!Array.isArray(level.npcs)) return false

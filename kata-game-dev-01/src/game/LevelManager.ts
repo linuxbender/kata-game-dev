@@ -25,7 +25,7 @@ import {
 /**
  * Random spawn position within a zone
  */
-function getRandomPositionInZone(zone: SpawnZone): { x: number; y: number } {
+const getRandomPositionInZone = (zone: SpawnZone): { x: number; y: number } => {
   return {
     x: zone.minX + Math.random() * (zone.maxX - zone.minX),
     y: zone.minY + Math.random() * (zone.maxY - zone.minY)

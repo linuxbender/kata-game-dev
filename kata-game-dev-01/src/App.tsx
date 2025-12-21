@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import './App.css'
 import { createWorld } from '@game/setupWorld'
 import { createMovementSystem } from '@engine/systems/MovementSystem'
 import { createEnemyAISystem } from '@engine/systems/EnemyAISystem'
@@ -331,36 +332,18 @@ const App = () => {
   return (
     <GameStateProvider world={gameWorld} playerId={gamePlayerId}>
       {/* Main game container */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          overflow: 'hidden',
-          backgroundColor: '#000',
-        }}
-      >
+      <div className="app-container">
         {/* Canvas - now uses fixed positioning from useCanvas */}
         <canvas ref={canvasRef} />
 
         {/* React-based HealthBar overlay (single source of truth) */}
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            left: '20px',
-            zIndex: 1000,
-            pointerEvents: 'none',
-          }}
-        >
+        <div className="health-bar-overlay">
           <HealthBar entity={gamePlayerId} width={250} height={35} />
         </div>
 
         {/* Inventory Panel - small fixed panel (no fullscreen backdrop) */}
         {inventoryVisible && (
-          <div style={{ position: 'fixed', top: '80px', left: '20px', zIndex: 1002, pointerEvents: 'auto' }}>
+          <div className="inventory-panel-container">
             <InventoryPanel
               onClose={() => setInventoryVisible(false)}
               items={
@@ -385,7 +368,7 @@ const App = () => {
         )}
         {/* Equipment Panel - right next to InventoryPanel */}
         {equipmentVisible && (
-          <div style={{ position: 'fixed', top: '80px', left: '340px', zIndex: 1002, pointerEvents: 'auto' }}>
+          <div className="equipment-panel-container">
             <EquipmentPanel
               equipment={
                 (gameWorld && gamePlayerId != null)
@@ -421,29 +404,15 @@ const App = () => {
         )}
 
         {/* Debug info */}
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            left: '20px',
-            zIndex: 1001,
-            color: '#0f0',
-            fontSize: '12px',
-            fontFamily: 'monospace',
-            pointerEvents: 'none',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            padding: '8px 12px',
-            borderRadius: '4px',
-          }}
-        >
+        <div className="debug-info">
           <div>World: {gameWorld ? '✓' : '✗'}</div>
           <div>Player: {gamePlayerId ? '✓' : '✗'}</div>
           <div>Ready: {ready ? '✓' : '✗'}</div>
-          <div style={{ marginTop: 4, fontSize: '11px', color: '#aaa' }}>
+          <div className="debug-info-hotkeys">
             Level Hotkeys: 1 (Forest), 2 (Cave), 3 (Fortress)
           </div>
           {/* Debug buttons (pointerEvents enabled) */}
-          <div style={{ marginTop: 8, pointerEvents: 'auto', display: 'flex', gap: 8 }}>
+          <div className="debug-buttons">
             <button onClick={() => {
                const w = worldRef.current; const p = playerRef.current; if (!w || p==null) return; const hp = w.getComponent(p, COMPONENTS.HEALTH); if (!hp) return; const newHp = { ...hp, current: Math.max(0, hp.current - 10) }; w.addComponent(p, COMPONENTS.HEALTH, newHp); try{ w.markComponentUpdated(p, COMPONENTS.HEALTH) }catch{};
              }}>Damage -10</button>

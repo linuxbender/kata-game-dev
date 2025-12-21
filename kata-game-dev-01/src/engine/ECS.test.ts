@@ -469,5 +469,138 @@ describe('World', () => {
       expect(results).toHaveLength(500)
     })
   })
-})
 
+  describe('removeComponent', () => {
+    it('should remove a component from an entity', () => {
+      const entity = world.createEntity()
+      world.addComponent(entity, 'position', { x: 10, y: 20 })
+      
+      const position = world.getComponent(entity, 'position')
+      expect(position).toEqual({ x: 10, y: 20 })
+      
+      world.removeComponent(entity, 'position')
+      
+      const positionAfter = world.getComponent(entity, 'position')
+      expect(positionAfter).toBeUndefined()
+    })
+
+    it('should emit REMOVE event when component is removed', () => {
+      const entity = world.createEntity()
+      world.addComponent(entity, 'position', { x: 10, y: 20 })
+      
+      const events: ComponentEvent<TestComponents>[] = []
+      world.onComponentEvent((event) => {
+        events.push(event)
+      })
+      
+      world.removeComponent(entity, 'position')
+      
+      expect(events).toHaveLength(1)
+      expect(events[0].type).toBe(EVENT_TYPES.REMOVE)
+      expect(events[0].entity).toBe(entity)
+      expect(events[0].name).toBe('position')
+    })
+
+    it('should do nothing if component does not exist', () => {
+      const entity = world.createEntity()
+      
+      const events: ComponentEvent<TestComponents>[] = []
+      world.onComponentEvent((event) => {
+        events.push(event)
+      })
+      
+      world.removeComponent(entity, 'position')
+      
+      expect(events).toHaveLength(0)
+    })
+
+    it('should only remove specified component', () => {
+      const entity = world.createEntity()
+      world.addComponent(entity, 'position', { x: 10, y: 20 })
+      world.addComponent(entity, 'velocity', { dx: 1, dy: 2 })
+      
+      world.removeComponent(entity, 'position')
+      
+      const position = world.getComponent(entity, 'position')
+      const velocity = world.getComponent(entity, 'velocity')
+      expect(position).toBeUndefined()
+      expect(velocity).toEqual({ dx: 1, dy: 2 })
+    })
+  })
+
+  describe('removeEntity', () => {
+    it('should remove all components from an entity', () => {
+      const entity = world.createEntity()
+      world.addComponent(entity, 'position', { x: 10, y: 20 })
+      world.addComponent(entity, 'velocity', { dx: 1, dy: 2 })
+      world.addComponent(entity, 'health', { hp: 100, maxHp: 100 })
+      
+      world.removeEntity(entity)
+      
+      expect(world.getComponent(entity, 'position')).toBeUndefined()
+      expect(world.getComponent(entity, 'velocity')).toBeUndefined()
+      expect(world.getComponent(entity, 'health')).toBeUndefined()
+    })
+
+    it('should emit REMOVE events for all components', () => {
+      const entity = world.createEntity()
+      world.addComponent(entity, 'position', { x: 10, y: 20 })
+      world.addComponent(entity, 'velocity', { dx: 1, dy: 2 })
+      
+      const events: ComponentEvent<TestComponents>[] = []
+      world.onComponentEvent((event) => {
+        if (event.type === EVENT_TYPES.REMOVE) {
+          events.push(event)
+        }
+      })
+      
+      world.removeEntity(entity)
+      
+      expect(events.length).toBeGreaterThanOrEqual(2)
+      const componentNames = events.map(e => e.name)
+      expect(componentNames).toContain('position')
+      expect(componentNames).toContain('velocity')
+    })
+
+    it('should not affect other entities', () => {
+      const entity1 = world.createEntity()
+      const entity2 = world.createEntity()
+      world.addComponent(entity1, 'position', { x: 10, y: 20 })
+      world.addComponent(entity2, 'position', { x: 30, y: 40 })
+      
+      world.removeEntity(entity1)
+      
+      expect(world.getComponent(entity1, 'position')).toBeUndefined()
+      expect(world.getComponent(entity2, 'position')).toEqual({ x: 30, y: 40 })
+    })
+
+    it('should remove entity from query results', () => {
+      const entity1 = world.createEntity()
+      const entity2 = world.createEntity()
+      world.addComponent(entity1, 'position', { x: 10, y: 20 })
+      world.addComponent(entity2, 'position', { x: 30, y: 40 })
+      
+      const resultsBefore = world.query('position')
+      expect(resultsBefore).toHaveLength(2)
+      
+      world.removeEntity(entity1)
+      
+      const resultsAfter = world.query('position')
+      expect(resultsAfter).toHaveLength(1)
+      expect(resultsAfter[0].entity).toBe(entity2)
+    })
+
+    it('should do nothing if entity has no components', () => {
+      const entity = world.createEntity()
+      
+      const events: ComponentEvent<TestComponents>[] = []
+      world.onComponentEvent((event) => {
+        events.push(event)
+      })
+      
+      world.removeEntity(entity)
+      
+      expect(events).toHaveLength(0)
+    })
+  })
+})
