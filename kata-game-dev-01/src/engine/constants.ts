@@ -27,7 +27,9 @@ export const COMPONENTS = {
     CHARACTER_STATS: 'CharacterStats',
     NPC: 'NPC',
     ITEM: 'Item',
-    METADATA: 'Metadata'
+    METADATA: 'Metadata',
+    DIALOG_STATE: 'DialogState',
+    QUEST_FLAGS: 'QuestFlags'
 } as const satisfies Record<string, string>
 
 /**
