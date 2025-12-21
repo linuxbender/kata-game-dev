@@ -17,10 +17,12 @@ import { pickupItem, consumeItem, dropItem } from '@game/GameActions'
 import { createItemInstance } from '@game/configs/ItemConfig'
 import InventoryPanel from './ui/components/InventoryPanel'
 import EquipmentPanel from './ui/components/EquipmentPanel'
+import SaveLoadMenu from './ui/components/SaveLoadMenu'
 import { WeaponSystem } from '@engine/systems/WeaponSystem'
 import ITEM_CATALOG from '@game/configs/ItemConfig'
 import { LevelManager } from '@game/LevelManager'
 import { LevelTransition } from './ui/components/LevelTransition'
+import { saveGame, loadGame } from '@game/SaveSystem'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
@@ -35,6 +37,7 @@ const App = () => {
   const [inventoryVisible, setInventoryVisible] = useState(false)
   const [equipmentVisible, setEquipmentVisible] = useState(false)
   const [inventoryVersion, setInventoryVersion] = useState(0)
+  const [saveLoadVisible, setSaveLoadVisible] = useState(false)
   
   // Level transition state
   const [transitionActive, setTransitionActive] = useState(false)
@@ -189,6 +192,17 @@ const App = () => {
         if (key === 'escape') setEquipmentVisible(false)
       }
       
+      // Save/Load menu hotkey
+      const saveLoadKey = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase()
+        if (key === 's') {
+          setSaveLoadVisible(v => !v)
+        }
+        if (key === 'escape') {
+          setSaveLoadVisible(false)
+        }
+      }
+      
       // Level switching keys: 1, 2, 3 for different levels
       const levelSwitchKey = (e: KeyboardEvent) => {
         const key = e.key
@@ -219,6 +233,7 @@ const App = () => {
       window.addEventListener('keydown', debugDamageKey)
       window.addEventListener('keydown', inventoryKey)
       window.addEventListener('keydown', equipmentKey)
+      window.addEventListener('keydown', saveLoadKey)
       window.addEventListener('keydown', levelSwitchKey)
 
       let last = performance.now()
@@ -316,6 +331,7 @@ const App = () => {
         window.removeEventListener('keydown', debugDamageKey)
         window.removeEventListener('keydown', inventoryKey)
         window.removeEventListener('keydown', equipmentKey)
+        window.removeEventListener('keydown', saveLoadKey)
         window.removeEventListener('keydown', levelSwitchKey)
         unsubscribe()
         unsubInv()
@@ -402,6 +418,42 @@ const App = () => {
             />
           </div>
         )}
+        
+        {/* Save/Load Menu */}
+        {saveLoadVisible && (
+          <SaveLoadMenu
+            onClose={() => setSaveLoadVisible(false)}
+            onSave={(slot, name) => {
+              const w = worldRef.current
+              const p = playerRef.current
+              const lm = levelManagerRef.current
+              if (!w || p == null || !lm) return
+              const currentLevel = lm.getCurrentLevel()
+              const levelId = currentLevel?.id || 'unknown'
+              saveGame(w, p, levelId, slot, name)
+              console.log(`[App] Game saved to slot ${slot}`)
+            }}
+            onLoad={(slot) => {
+              const w = worldRef.current
+              const lm = levelManagerRef.current
+              if (!w || !lm) return
+              const saveData = loadGame(w, slot)
+              if (saveData) {
+                console.log(`[App] Game loaded from slot ${slot}`)
+                // Transition to the saved level
+                lm.transitionToLevel(saveData.levelId, () => {
+                  console.log(`[App] Level transition complete after load`)
+                })
+                // Update player ref if needed
+                if (saveData.playerData.entityId !== playerRef.current) {
+                  playerRef.current = saveData.playerData.entityId
+                  setGamePlayerId(saveData.playerData.entityId)
+                }
+              }
+            }}
+            currentLevelId={levelManagerRef.current?.getCurrentLevel()?.id}
+          />
+        )}
 
         {/* Debug info */}
         <div className="debug-info">
@@ -410,6 +462,9 @@ const App = () => {
           <div>Ready: {ready ? '✓' : '✗'}</div>
           <div className="debug-info-hotkeys">
             Level Hotkeys: 1 (Forest), 2 (Cave), 3 (Fortress)
+          </div>
+          <div className="debug-info-hotkeys">
+            Save/Load: S
           </div>
           {/* Debug buttons (pointerEvents enabled) */}
           <div className="debug-buttons">

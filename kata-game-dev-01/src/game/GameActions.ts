@@ -199,6 +199,43 @@ export const attackEntity = (world: World, attacker: number, target: number, wea
   return true
 }
 
+/**
+ * Save current game state to a slot.
+ * @param world - The game world
+ * @param player - Player entity
+ * @param levelId - Current level ID
+ * @param slotNumber - Save slot number
+ * @param slotName - Optional save name
+ * @returns true if save succeeded
+ * @example
+ * saveGameState(world, player, 'level_1_forest', 0, 'My Save')
+ */
+export const saveGameState = (
+  world: World,
+  player: number,
+  levelId: string,
+  slotNumber: number,
+  slotName?: string
+): boolean => {
+  // Import dynamically to avoid circular deps
+  const { saveGame } = require('./SaveSystem')
+  return saveGame(world, player, levelId, slotNumber, slotName)
+}
+
+/**
+ * Load game state from a slot.
+ * @param world - The game world
+ * @param slotNumber - Save slot number
+ * @returns Loaded save data or null
+ * @example
+ * const save = loadGameState(world, 0)
+ */
+export const loadGameState = (world: World, slotNumber: number) => {
+  // Import dynamically to avoid circular deps
+  const { loadGame } = require('./SaveSystem')
+  return loadGame(world, slotNumber)
+}
+
 export default {
   pickupItem,
   dropItem,
@@ -207,5 +244,7 @@ export default {
   equipItem,
   unequipItem,
   swapEquipment,
-  attackEntity
+  attackEntity,
+  saveGameState,
+  loadGameState
 }
