@@ -1,146 +1,175 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import { LevelTransition } from './LevelTransition'
+import LevelTransition, { type LevelTransitionProps } from './LevelTransition'
 
-describe('LevelTransition', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
+ const renderTransition = (props: LevelTransitionProps) => {
+   let result!: ReturnType<typeof render>
 
-  afterEach(() => {
-    vi.runOnlyPendingTimers()
-    vi.useRealTimers()
-  })
+   act(() => {
+     result = render(<LevelTransition {...props} />)
+   })
 
-  it('should render nothing when not active', () => {
-    const { container } = render(
-      <LevelTransition isActive={false} />
-    )
-    expect(container.firstChild).toBeNull()
-  })
+   return result
+ }
 
-  it('should render transition when active', () => {
-    const { container } = render(
-      <LevelTransition isActive={true} levelName="Test Level" />
-    )
-    expect(container.firstChild).toBeTruthy()
-  })
+ const rerenderTransition = (result: ReturnType<typeof render>, props: LevelTransitionProps) => {
+   act(() => {
+     result.rerender(<LevelTransition {...props} />)
+   })
+ }
 
-  it('should display level name', () => {
-    render(
-      <LevelTransition isActive={true} levelName="Forest Clearing" />
-    )
-    expect(screen.getByText('Forest Clearing')).toBeTruthy()
-  })
+ describe('LevelTransition', () => {
+   beforeEach(() => {
+     vi.useFakeTimers()
+   })
 
-  it('should display level description', () => {
-    render(
-      <LevelTransition 
-        isActive={true} 
-        levelName="Forest Clearing"
-        levelDescription="A peaceful forest with scattered goblin scouts"
-      />
-    )
-    expect(screen.getByText('A peaceful forest with scattered goblin scouts')).toBeTruthy()
-  })
+   afterEach(() => {
+     vi.runOnlyPendingTimers()
+     vi.useRealTimers()
+   })
 
-  it('should call onComplete after transition duration', async () => {
-    const onComplete = vi.fn()
-    render(
-      <LevelTransition 
-        isActive={true} 
-        levelName="Test Level"
-        duration={2000}
-        onComplete={onComplete}
-      />
-    )
+   it('should render nothing when not active', async () => {
+     let container: HTMLElement | null = null
+     await act(async () => {
+       const result = renderTransition({ isActive: false })
+       container = result.container
+       await Promise.resolve()
+     })
+     expect(container!.firstChild).toBeNull()
+   })
 
-    expect(onComplete).not.toHaveBeenCalled()
+   it('should render transition when active', async () => {
+     let container: HTMLElement | null = null
+     await act(async () => {
+       const result = renderTransition({
+         isActive: true,
+         levelName: 'Test Level'
+       })
+       container = result.container
+       await Promise.resolve()
+     })
+     expect(container!.firstChild).toBeTruthy()
+   })
 
-    // Fast-forward through the entire transition
-    await act(async () => {
-      vi.advanceTimersByTime(2000)
-    })
+   it('should display level name', async () => {
+     await act(async () => {
+       renderTransition({ isActive: true, levelName: 'Forest Clearing' })
+       await Promise.resolve()
+     })
+     expect(screen.getByText('Forest Clearing')).toBeTruthy()
+   })
 
-    expect(onComplete).toHaveBeenCalledTimes(1)
-  })
+   it('should display level description', async () => {
+     await act(async () => {
+       renderTransition({
+         isActive: true,
+         levelName: 'Forest Clearing',
+         levelDescription: 'A peaceful forest with scattered goblin scouts'
+       })
+       await Promise.resolve()
+     })
+     expect(screen.getByText('A peaceful forest with scattered goblin scouts')).toBeTruthy()
+   })
 
-  it('should handle custom duration', async () => {
-    const onComplete = vi.fn()
-    const customDuration = 1000
-    render(
-      <LevelTransition 
-        isActive={true} 
-        levelName="Test Level"
-        duration={customDuration}
-        onComplete={onComplete}
-      />
-    )
+   it('should call onComplete after transition duration', async () => {
+     const onComplete = vi.fn()
+     await act(async () => {
+       renderTransition({
+         isActive: true,
+         levelName: 'Test Level',
+         duration: 2000,
+         onComplete
+       })
+       await Promise.resolve()
+     })
+     expect(onComplete).not.toHaveBeenCalled()
+     await act(async () => {
+       vi.advanceTimersByTime(2000)
+     })
+     expect(onComplete).toHaveBeenCalledTimes(1)
+   })
 
-    await act(async () => {
-      vi.advanceTimersByTime(customDuration)
-    })
+   it('should handle custom duration', async () => {
+     const onComplete = vi.fn()
+     const customDuration = 1000
+     await act(async () => {
+       renderTransition({
+         isActive: true,
+         levelName: 'Test Level',
+         duration: customDuration,
+         onComplete
+       })
+       await Promise.resolve()
+     })
+     await act(async () => {
+       vi.advanceTimersByTime(customDuration)
+     })
+     expect(onComplete).toHaveBeenCalledTimes(1)
+   })
 
-    expect(onComplete).toHaveBeenCalledTimes(1)
-  })
+   it('should not call onComplete if deactivated early', async () => {
+     const onComplete = vi.fn()
+     let renderResult: ReturnType<typeof render> | null = null
+     await act(async () => {
+       renderResult = renderTransition({
+         isActive: true,
+         levelName: 'Test Level',
+         duration: 2000,
+         onComplete
+       })
+       await Promise.resolve()
+     })
+     await act(async () => {
+       vi.advanceTimersByTime(500)
+     })
+     await act(async () => {
+       rerenderTransition(renderResult!, {
+         isActive: false,
+         levelName: 'Test Level',
+         duration: 2000,
+         onComplete
+       })
+       await Promise.resolve()
+     })
+     await act(async () => {
+       vi.advanceTimersByTime(2000)
+     })
+     expect(onComplete).not.toHaveBeenCalled()
+   })
 
-  it('should not call onComplete if deactivated early', async () => {
-    const onComplete = vi.fn()
-    const { rerender } = render(
-      <LevelTransition 
-        isActive={true} 
-        levelName="Test Level"
-        duration={2000}
-        onComplete={onComplete}
-      />
-    )
+   it('should render with only level name (no description)', async () => {
+     await act(async () => {
+       renderTransition({ isActive: true, levelName: 'Test Level' })
+       await Promise.resolve()
+     })
+     expect(screen.getByText('Test Level')).toBeTruthy()
+   })
 
-    // Advance time partially
-    await act(async () => {
-      vi.advanceTimersByTime(500)
-    })
+   it('should have correct className for overlay', async () => {
+     let container: HTMLElement | null = null
+     await act(async () => {
+       const result = renderTransition({
+         isActive: true,
+         levelName: 'Test Level'
+       })
+       container = result.container
+       await Promise.resolve()
+     })
+     const overlay = container!.firstChild as HTMLElement
+     expect(overlay.className).toBe('level-transition-overlay')
+   })
 
-    // Deactivate
-    rerender(
-      <LevelTransition 
-        isActive={false} 
-        levelName="Test Level"
-        duration={2000}
-        onComplete={onComplete}
-      />
-    )
-
-    // Advance rest of time
-    await act(async () => {
-      vi.advanceTimersByTime(2000)
-    })
-
-    expect(onComplete).not.toHaveBeenCalled()
-  })
-
-  it('should render with only level name (no description)', () => {
-    render(
-      <LevelTransition 
-        isActive={true} 
-        levelName="Test Level"
-      />
-    )
-    expect(screen.getByText('Test Level')).toBeTruthy()
-  })
-
-  it('should have correct className for overlay', () => {
-    const { container } = render(
-      <LevelTransition isActive={true} levelName="Test Level" />
-    )
-    const overlay = container.firstChild as HTMLElement
-    expect(overlay.className).toBe('level-transition-overlay')
-  })
-
-  it('should apply opacity transition style', () => {
-    const { container } = render(
-      <LevelTransition isActive={true} levelName="Test Level" />
-    )
-    const overlay = container.firstChild as HTMLElement
-    expect(overlay.style.transition).toContain('opacity')
-  })
-})
+   it('should apply opacity transition style', async () => {
+     let container: HTMLElement | null = null
+     await act(async () => {
+       const result = renderTransition({
+         isActive: true,
+         levelName: 'Test Level'
+       })
+       container = result.container
+       await Promise.resolve()
+     })
+     const overlay = container!.firstChild as HTMLElement
+     expect(overlay.style.transition).toContain('opacity')
+   })
+ })
