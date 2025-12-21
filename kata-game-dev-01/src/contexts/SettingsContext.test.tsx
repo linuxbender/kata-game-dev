@@ -2,40 +2,13 @@
  * Settings Context Tests
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, act, renderHook } from '@testing-library/react'
 import { SettingsProvider, useSettings, DEFAULT_SETTINGS, type GameSettings } from './SettingsContext'
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {}
-
-  return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => {
-      store[key] = value
-    },
-    removeItem: (key: string) => {
-      delete store[key]
-    },
-    clear: () => {
-      store = {}
-    }
-  }
-})()
-
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock
-})
+// Note: localStorage mock is provided by vitest.setup.ts globally
 
 describe('SettingsContext', () => {
-  beforeEach(() => {
-    localStorageMock.clear()
-  })
-
-  afterEach(() => {
-    localStorageMock.clear()
-  })
 
   describe('SettingsProvider', () => {
     it('should render children', () => {
@@ -64,7 +37,7 @@ describe('SettingsContext', () => {
           masterVolume: 0.5
         }
       }
-      localStorageMock.setItem('kata-game-settings', JSON.stringify(customSettings))
+      localStorage.setItem('kata-game-settings', JSON.stringify(customSettings))
 
       const { result } = renderHook(() => useSettings(), {
         wrapper: SettingsProvider
@@ -74,7 +47,7 @@ describe('SettingsContext', () => {
     })
 
     it('should handle corrupted localStorage data gracefully', () => {
-      localStorageMock.setItem('kata-game-settings', 'invalid json')
+      localStorage.setItem('kata-game-settings', 'invalid json')
 
       const { result } = renderHook(() => useSettings(), {
         wrapper: SettingsProvider
@@ -218,7 +191,7 @@ describe('SettingsContext', () => {
         })
       })
 
-      const stored = localStorageMock.getItem('kata-game-settings')
+      const stored = localStorage.getItem('kata-game-settings')
       expect(stored).toBeDefined()
       const parsed = JSON.parse(stored!)
       expect(parsed.audio.masterVolume).toBe(0.7)
@@ -297,7 +270,7 @@ describe('SettingsContext', () => {
         result.current.resetSettings()
       })
 
-      const stored = localStorageMock.getItem('kata-game-settings')
+      const stored = localStorage.getItem('kata-game-settings')
       expect(stored).toBeDefined()
       const parsed = JSON.parse(stored!)
       expect(parsed).toEqual(DEFAULT_SETTINGS)
@@ -347,7 +320,7 @@ describe('SettingsContext', () => {
         accessibility: { colorblindMode: false, reduceMotion: false }
         // Missing largeText and highContrast
       }
-      localStorageMock.setItem('kata-game-settings', JSON.stringify(oldSettings))
+      localStorage.setItem('kata-game-settings', JSON.stringify(oldSettings))
 
       const { result } = renderHook(() => useSettings(), {
         wrapper: SettingsProvider

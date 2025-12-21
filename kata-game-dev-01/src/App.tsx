@@ -6,7 +6,6 @@ import { createEnemyAISystem } from '@engine/systems/EnemyAISystem'
 import { createRenderSystem } from '@engine/systems/RenderSystem'
 import { createInputSystem, INPUT_ACTIONS } from '@engine/systems/InputSystem'
 import { createQuadTree } from '@engine/spatial/QuadTree'
-import { createDebugOverlay } from '@engine/systems/DebugOverlay'
 import { ReactiveWorld } from '@engine/ReactiveWorld'
 import { COMPONENTS, EVENT_TYPES } from '@engine/constants'
 import { useCanvas } from '@hooks/useCanvas'
@@ -137,9 +136,6 @@ const App = () => {
         }
       )
 
-      // Initialize debug overlay (toggle with Shift+D)
-      const debugOverlay = createDebugOverlay(canvas)
-
       // Initialize render system with smooth camera follow and spatial culling
       // NOTE: we no longer use a canvas-based HUD renderer; UI is React-based.
       const { update: renderUpdate } = createRenderSystem(canvas, player, {
@@ -149,7 +145,7 @@ const App = () => {
           deadZoneRadius: 3,
           lookAheadFactor: 0.2
         }
-      }, quad, debugOverlay)
+      }, quad)
 
       // Track entities in quad tree for incremental updates
       const trackedEntities = new Set<number>()
@@ -252,9 +248,6 @@ const App = () => {
       }
       
       canvas.addEventListener('click', handleCanvasClick)
-
-      // Track last debug toggle state to detect changes
-      let lastDebugState = false
 
       // Debug keys: H = damage -10, J = heal +10, I = inventory toggle
       const debugDamageKey = (e: KeyboardEvent) => {
@@ -385,13 +378,6 @@ const App = () => {
         let inputStart = performance.now()
         inputSystem.update(reactiveWorld, player, dt)
         performanceMonitor.recordSystemTime('input', performance.now() - inputStart)
-
-        // Handle debug overlay toggle
-        const debugPressed = inputSystem.isActionPressed(INPUT_ACTIONS.DEBUG_TOGGLE)
-        if (debugPressed && !lastDebugState) {
-          debugOverlay.toggle()
-        }
-        lastDebugState = debugPressed
 
         // Update movement
         let movementStart = performance.now()
