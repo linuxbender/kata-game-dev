@@ -26,7 +26,8 @@ export const COMPONENTS = {
     EQUIPMENT: 'Equipment',
     CHARACTER_STATS: 'CharacterStats',
     NPC: 'NPC',
-    ITEM: 'Item'
+    ITEM: 'Item',
+    METADATA: 'Metadata'
 } as const satisfies Record<string, string>
 
 /**

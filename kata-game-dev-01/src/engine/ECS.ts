@@ -236,6 +236,55 @@ export class World<C extends ComponentSchema = ComponentSchema> {
     }
 
     /**
+     * Remove a component from an entity
+     * @param entity Entity identifier
+     * @param name Component name or key
+     * @example
+     * ```ts
+     * world.removeComponent(entity, 'position');
+     * ```
+     * @returns void
+     */
+    removeComponent = <K extends keyof C | ComponentKey>(entity: Entity, name: K): void => {
+        const key = String(name)
+        const map = this.components.get(key) as Map<Entity, C[ResolvedKey<C, K>]> | undefined
+        if (map && map.has(entity)) {
+            map.delete(entity)
+            const ev: KnownComponentEvent<C, K> = {
+                type: EVENT_TYPES.REMOVE,
+                entity,
+                name
+            } as KnownComponentEvent<C, K>
+            this.emit(ev)
+        }
+    }
+
+    /**
+     * Remove an entity and all its components
+     * @param entity Entity identifier to remove
+     * @example
+     * ```ts
+     * world.removeEntity(entity);
+     * ```
+     * @returns void
+     */
+    removeEntity = (entity: Entity): void => {
+        // Remove from all component maps
+        for (const [componentName, map] of this.components.entries()) {
+            if (map.has(entity)) {
+                map.delete(entity)
+                // Emit remove event for each component
+                const ev = {
+                    type: EVENT_TYPES.REMOVE,
+                    entity,
+                    name: componentName
+                }
+                this.emit(ev as ComponentEvent<C>)
+            }
+        }
+    }
+
+    /**
      * Mark a component as updated and emit update event
      * @param entity Entity identifier
      * @param name Component name or key
