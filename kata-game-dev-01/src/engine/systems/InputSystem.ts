@@ -1,5 +1,4 @@
 import { COMPONENTS } from '@engine/constants'
-import type { TypedWorld } from '@engine/componentTypes'
 
 // Input action types as const object for type safety
 export const INPUT_ACTIONS = {
@@ -33,7 +32,7 @@ export const DEFAULT_INPUT_MAPPING: InputMapping = {
   [INPUT_ACTIONS.MOVE_DOWN]: ['s', 'arrowdown'],
   [INPUT_ACTIONS.MOVE_LEFT]: ['a', 'arrowleft'],
   [INPUT_ACTIONS.MOVE_RIGHT]: ['d', 'arrowright'],
-  [INPUT_ACTIONS.ACTION_PRIMARY]: ['space', 'enter'],
+  [INPUT_ACTIONS.ACTION_PRIMARY]: ['space', ' '],
   [INPUT_ACTIONS.ACTION_SECONDARY]: ['shift'],
   [INPUT_ACTIONS.DEBUG_TOGGLE]: ['f3'],
   [INPUT_ACTIONS.PAUSE]: ['escape', 'p']
@@ -91,7 +90,7 @@ export const createInputSystem = (config: Partial<InputSystemConfig> = {}) => {
   }
 
   // Update player movement based on input state
-  const updateMovement = (world: TypedWorld, playerEntity: number, dt: number) => {
+  const updateMovement = (world: any, playerEntity: number, dt: number) => {
     let vx = 0
     let vy = 0
 
@@ -114,7 +113,7 @@ export const createInputSystem = (config: Partial<InputSystemConfig> = {}) => {
   }
 
   // Update function called each frame
-  const update = (world: TypedWorld, playerEntity: number, dt: number) => {
+  const update = (world: any, playerEntity: number, dt: number) => {
     updateMovement(world, playerEntity, dt)
   }
 
@@ -160,4 +159,3 @@ export const createInputSystem = (config: Partial<InputSystemConfig> = {}) => {
     getPressedKeys: () => Array.from(pressedKeys)
   }
 }
-

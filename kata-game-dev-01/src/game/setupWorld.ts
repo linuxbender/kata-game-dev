@@ -8,6 +8,7 @@ import {
   createEntityFromBlueprint,
   type EntityBlueprint,
 } from '@game/configs/EntityBlueprints'
+import { createItemInstance } from './configs/ItemConfig'
 
 /**
  * QuadTree configuration type.
@@ -147,6 +148,14 @@ export const createWorld = (worldInstance?: World): {
   // 1. Create and setup player
   const player = world.createEntity()
   instantiateBlueprint(world, PLAYER_BLUEPRINT, player)
+  // Füge Iron Sword ins Inventory hinzu
+  let inventory = world.getComponent(player, COMPONENTS.INVENTORY)
+  if (!Array.isArray(inventory)) inventory = []
+  const sword = createItemInstance('sword_iron', 1)
+  inventory.push(sword)
+  world.addComponent(player, COMPONENTS.INVENTORY, inventory)
+  // Rüste das Schwert im mainHand aus
+  world.addComponent(player, COMPONENTS.EQUIPMENT, { slots: { mainHand: sword.uid } })
 
   // 2. Spawn enemies at predefined locations
   for (const spawn of ENEMY_SPAWNS) {

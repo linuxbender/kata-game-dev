@@ -2,6 +2,8 @@ import type { World } from '@engine/ECS'
 import { COMPONENTS } from '@engine/constants'
 import type { InventoryItem } from './configs/ItemConfig'
 import { getItemDefinition } from './configs/ItemConfig'
+import EquipmentSystem from '@engine/systems/EquipmentSystem'
+import { WeaponSystem } from '@engine/systems/WeaponSystem'
 
 /**
  * Pickup item: add to player's inventory, respecting stack rules.
@@ -133,9 +135,77 @@ export const moveItem = (world: World, player: number, fromIndex: number, toInde
   return true
 }
 
+/**
+ * Equip an item from inventory into a given equipment slot.
+ * Uses EquipmentSystem for slot validation and stat updates.
+ * @example
+ * equipItem(world, player, 'mainHand', item)
+ */
+export const equipItem = (world: World, player: number, slot: string, item: InventoryItem): boolean => {
+  const eq = new EquipmentSystem(world)
+  return eq.equip(player, slot, item)
+}
+
+/**
+ * Unequip an item from a given slot. Returns the uid of the removed item or undefined.
+ * Uses EquipmentSystem for slot validation and stat updates.
+ * @example
+ * unequipItem(world, player, 'mainHand')
+ */
+export const unequipItem = (world: World, player: number, slot: string): string | undefined => {
+  const eq = new EquipmentSystem(world)
+  return eq.unequip(player, slot)
+}
+
+/**
+ * Swap two equipment slots (e.g., mainHand <-> offHand). Returns true if swapped.
+ * Uses EquipmentSystem for slot validation.
+ * @example
+ * swapEquipment(world, player, 'mainHand', 'offHand')
+ */
+export const swapEquipment = (world: World, player: number, slotA: string, slotB: string): boolean => {
+  const eq = new EquipmentSystem(world)
+  return eq.swapSlots(player, slotA, slotB)
+}
+
+/**
+ * Attack another entity using a weapon from inventory.
+ * Handles cooldown, damage calculation, and effect triggering.
+ * @param world - The game world
+ * @param attacker - Attacking entity
+ * @param target - Target entity
+ * @param weaponUid - UID of weapon in attacker's inventory
+ * @returns true if attack was executed (hit or miss), false if not possible
+ * @example
+ * attackEntity(world, player, enemy, sword.uid)
+ */
+export const attackEntity = (world: World, attacker: number, target: number, weaponUid: string): boolean => {
+  const inv = world.getComponent(attacker, COMPONENTS.INVENTORY) as InventoryItem[] | undefined
+  if (!inv) return false
+  const weapon = inv.find(i => i.uid === weaponUid)
+  if (!weapon) return false
+  // Get weapon definition (must be type weapon)
+  const def = getItemDefinition(weapon.id)
+  if (!def || def.type !== 'weapon') return false
+  // Compose weapon instance for WeaponSystem
+  const weaponInstance = { ...weapon, ...def } as any // Type: Weapon
+  const ws = new WeaponSystem(world)
+  // Check cooldown
+  if (!ws.isAttackReady(attacker, weaponInstance)) return false
+  // Execute attack
+  const result = ws.executeAttack(attacker, target, weaponInstance)
+  // (Optional) handle effects here (e.g. onHit, onCrit, etc.)
+  // ...
+  return true
+}
+
 export default {
   pickupItem,
   dropItem,
   consumeItem,
-  moveItem
+  moveItem,
+  equipItem,
+  unequipItem,
+  swapEquipment,
+  attackEntity
 }

@@ -22,7 +22,11 @@ export const COMPONENTS = {
     RENDERABLE: 'Renderable',
     ENEMY: 'Enemy',
     HEALTH: 'Health',
-    INVENTORY: 'Inventory'
+    INVENTORY: 'Inventory',
+    EQUIPMENT: 'Equipment',
+    CHARACTER_STATS: 'CharacterStats',
+    NPC: 'NPC',
+    ITEM: 'Item'
 } as const satisfies Record<string, string>
 
 /**

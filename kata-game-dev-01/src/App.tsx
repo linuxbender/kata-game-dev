@@ -15,6 +15,9 @@ import { HealthBar } from './ui/components/HealthBar'
 import { pickupItem, consumeItem, dropItem } from '@game/GameActions'
 import { createItemInstance } from '@game/configs/ItemConfig'
 import InventoryPanel from './ui/components/InventoryPanel'
+import EquipmentPanel from './ui/components/EquipmentPanel'
+import { WeaponSystem } from '@engine/systems/WeaponSystem'
+import ITEM_CATALOG from '@game/configs/ItemConfig'
 
 // Main app component that manages game loop, systems, and quad-tree spatial indexing
 const App = () => {
@@ -26,6 +29,7 @@ const App = () => {
   const [gameWorld, setGameWorld] = useState<ReactiveWorld | null>(null)
   const [gamePlayerId, setGamePlayerId] = useState<number | null>(null)
   const [inventoryVisible, setInventoryVisible] = useState(false)
+  const [equipmentVisible, setEquipmentVisible] = useState(false)
   const [inventoryVersion, setInventoryVersion] = useState(0)
 
   // Read persisted quad config from context outside the effect (follows React hooks rules)
@@ -163,11 +167,20 @@ const App = () => {
         if (key === 'i') setInventoryVisible(v => !v)
         if (key === 'escape') setInventoryVisible(false)
       }
+      const equipmentKey = (e: KeyboardEvent) => {
+        const key = e.key.toLowerCase()
+        if (key === 'e') setEquipmentVisible(v => !v)
+        if (key === 'escape') setEquipmentVisible(false)
+      }
       window.addEventListener('keydown', debugDamageKey)
       window.addEventListener('keydown', inventoryKey)
+      window.addEventListener('keydown', equipmentKey)
 
       let last = performance.now()
       let running = true
+
+      // WeaponSystem initialization
+      const weaponSystem = new WeaponSystem(reactiveWorld)
 
       // Main game loop frame
       const frame = (now: number) => {
@@ -193,6 +206,52 @@ const App = () => {
         // Update enemy AI (targeting, movement, attacks)
         enemyAIUpdate(reactiveWorld)
 
+        // --- WeaponSystem: Attack with space bar ---
+        if (inputSystem.isActionPressed(INPUT_ACTIONS.ACTION_PRIMARY)) {
+          // Find enemies in range
+          const playerTransform = reactiveWorld.getComponent(player, COMPONENTS.TRANSFORM)
+          const equipment = reactiveWorld.getComponent(player, COMPONENTS.EQUIPMENT)
+          const inventory = reactiveWorld.getComponent(player, COMPONENTS.INVENTORY) || []
+          const mainHandUid = equipment?.slots?.mainHand
+          const invItem = mainHandUid ? inventory.find((it: any) => it.uid === mainHandUid) : null
+          let weapon: any = null
+          if (invItem) {
+            const def = ITEM_CATALOG[invItem.id]
+            if (def && def.type === 'weapon') {
+              weapon = {
+                id: def.id,
+                name: def.name,
+                type: 'sword',
+                damage: { baseValue: def.stats?.attack ?? 5, variance: 2, type: 'physical' },
+                attackSpeed: 1.0,
+                range: 60,
+                weight: def.weight ?? 5,
+                durability: { current: invItem.durability ?? (def.stats?.durability ?? 100), max: def.stats?.durability ?? 100 },
+                effects: [],
+                rarity: def.rarity,
+                level: 1,
+                description: def.description,
+              }
+            }
+          }
+          if (playerTransform && weapon) {
+            const enemies = reactiveWorld.query(COMPONENTS.TRANSFORM, COMPONENTS.HEALTH)
+              .filter(e => e.entity !== player)
+            for (const e of enemies) {
+              const t = e.comps[0]
+              const dx = t.x - playerTransform.x
+              const dy = t.y - playerTransform.y
+              const dist = Math.sqrt(dx*dx + dy*dy)
+              if (dist < 120) {
+                // Execute attack
+                const result = weaponSystem.executeAttack(player, e.entity, weapon)
+                console.log(`[Attack] hit=${result.hit}`, { player, target: e.entity, dist, weapon, result })
+                break
+              }
+            }
+          }
+        }
+
         // Render frame (pass quad for debug metrics)
         try {
           renderUpdate(reactiveWorld, dt, { width: canvasSize.width, height: canvasSize.height }, quad)
@@ -211,6 +270,7 @@ const App = () => {
         inputSystem.detach()
         window.removeEventListener('keydown', debugDamageKey)
         window.removeEventListener('keydown', inventoryKey)
+        window.removeEventListener('keydown', equipmentKey)
         unsubscribe()
         unsubInv()
       }
@@ -274,6 +334,42 @@ const App = () => {
                 const p = playerRef.current
                 if (!w || p == null) return
                 dropItem(w as any, p, it.uid, 1)
+              }}
+            />
+          </div>
+        )}
+        {/* Equipment Panel - right next to InventoryPanel */}
+        {equipmentVisible && (
+          <div style={{ position: 'fixed', top: '80px', left: '340px', zIndex: 1002, pointerEvents: 'auto' }}>
+            <EquipmentPanel
+              equipment={
+                (gameWorld && gamePlayerId != null)
+                  ? ((gameWorld.getComponent(gamePlayerId, COMPONENTS.EQUIPMENT)?.slots) || {})
+                  : {}
+              }
+              items={
+                (gameWorld && gamePlayerId != null)
+                  ? (Array.isArray(gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY))
+                      ? (gameWorld.getComponent(gamePlayerId, COMPONENTS.INVENTORY) as any[])
+                      : []
+                    ).reduce((acc, it) => { acc[it.uid] = it; return acc }, {} as Record<string, any>)
+                  : {}
+              }
+              onUnequip={(slot) => {
+                const w = worldRef.current
+                const p = playerRef.current
+                if (!w || p == null) return
+                // Get equipment and inventory
+                const equipment = w.getComponent(p, COMPONENTS.EQUIPMENT)
+                if (!equipment || !equipment.slots) return
+                const uid = equipment.slots[slot]
+                if (!uid) return
+                // Clear slot
+                const newSlots = { ...equipment.slots }
+                delete newSlots[slot]
+                w.addComponent(p, COMPONENTS.EQUIPMENT, { slots: newSlots })
+                // (Optional) Inventory update trigger (usually detected automatically)
+                setInventoryVersion(v => v + 1)
               }}
             />
           </div>

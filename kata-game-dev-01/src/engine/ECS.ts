@@ -318,3 +318,5 @@ export class World<C extends ComponentSchema = ComponentSchema> {
         return Array.from(entities)
     }
 }
+
+export type { ComponentKey } from '@engine/constants'

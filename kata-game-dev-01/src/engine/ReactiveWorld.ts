@@ -22,7 +22,7 @@
  */
 
 import { World } from './ECS'
-import type { Entity, ComponentKey, ComponentSchema } from './ECS'
+import type { Entity, ComponentKey, ComponentSchema, KnownComponentEvent } from './ECS'
 
 /**
  * Component change callback type.
@@ -91,8 +91,9 @@ export class ReactiveWorld<C extends ComponentSchema = ComponentSchema> extends 
       this.changeListeners.set(key, new Set())
 
       // Subscribe to World events for this component (only once per component type)
-      const unsubscribeWorld = this.onComponentEventFor(componentName as any, (event) => {
-        this.notifyListeners(key, event.entity, event.component, event.type)
+      const unsubscribeWorld = this.onComponentEventFor(componentName as any, (event: KnownComponentEvent<C, any>) => {
+        // For REMOVE events, event.component is undefined
+        this.notifyListeners(key, event.entity, 'component' in event ? event.component : undefined, event.type)
       })
       this.worldUnsubscribers.set(key, unsubscribeWorld)
     }
@@ -217,4 +218,3 @@ export class ReactiveWorld<C extends ComponentSchema = ComponentSchema> extends 
     return listenerSet ? listenerSet.size : 0
   }
 }
-

@@ -1,0 +1,62 @@
+.equipment-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(30, 34, 44, 0.95);
+  border: 2px solid #3a4a6a;
+  border-radius: 10px;
+  padding: 18px 22px;
+  min-width: 220px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  color: #e0e6f0;
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+}
+
+.equipment-panel .equipment-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(44, 54, 74, 0.7);
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-height: 36px;
+}
+
+.equipment-panel .slot-label {
+  font-weight: 600;
+  text-transform: capitalize;
+  color: #a0b4d0;
+  flex: 1;
+}
+
+.equipment-panel .item-name {
+  color: #ffe082;
+  font-weight: 500;
+  margin-left: 8px;
+  flex: 2;
+}
+
+.equipment-panel .empty {
+  color: #7a869a;
+  font-style: italic;
+  margin-left: 8px;
+  flex: 2;
+}
+
+.equipment-panel .unequip-btn {
+  background: #2e3a4c;
+  color: #e0e6f0;
+  border: 1px solid #4a5a7a;
+  border-radius: 4px;
+  padding: 2px 10px;
+  margin-left: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s, color 0.15s;
+}
+.equipment-panel .unequip-btn:hover {
+  background: #ff5252;
+  color: #fff;
+  border-color: #ff5252;
+}
+

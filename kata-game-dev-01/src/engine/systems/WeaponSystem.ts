@@ -25,14 +25,13 @@ import type { World } from '@engine/ECS'
 import type { Entity } from '@engine/ECS'
 import type { Transform } from '@components/Transform'
 import type { Health } from '@components/Health'
-import type { Damage } from '@engine/componentTypes'
 import {
-  isWeapon,
   calculateWeaponDamage,
   damageDurability,
   canUseWeapon,
   type Weapon,
 } from '@components/Weapon'
+import { COMPONENTS } from '@engine/constants'
 
 /**
  * Attack result containing damage and metadata.
@@ -109,8 +108,8 @@ export class WeaponSystem {
     const weaponValid = canUseWeapon(weapon)
 
     // Calculate distance
-    const attackerTransform = this.world.getComponent(attacker, 'transform' as any) as Transform | undefined
-    const targetTransform = this.world.getComponent(target, 'transform' as any) as Transform | undefined
+    const attackerTransform = this.world.getComponent(attacker, COMPONENTS.TRANSFORM) as Transform | undefined
+    const targetTransform = this.world.getComponent(target, COMPONENTS.TRANSFORM) as Transform | undefined
     const distance = this.calculateDistance(attackerTransform, targetTransform)
 
     // Check if in range
@@ -123,16 +122,13 @@ export class WeaponSystem {
     let damage = 0
     if (hit) {
       damage = calculateWeaponDamage(weapon)
-
       // Apply damage to target
       this.applyDamage(target, damage)
-
       // Reduce weapon durability
       damageDurability(weapon)
-
-      // Record attack time
-      this.lastAttackTime.set(attacker, timestamp)
     }
+    // Record attack time (immer, egal ob Hit oder Miss)
+    this.lastAttackTime.set(attacker, timestamp)
 
     return {
       attacker,
@@ -163,7 +159,7 @@ export class WeaponSystem {
    * ```
    */
   applyDamage(entity: Entity, damage: number): number | undefined {
-    const health = this.world.getComponent(entity, 'health' as any) as Health | undefined
+    const health = this.world.getComponent(entity, COMPONENTS.HEALTH) as Health | undefined
     if (!health) return undefined
 
     health.current = Math.max(0, health.current - damage)

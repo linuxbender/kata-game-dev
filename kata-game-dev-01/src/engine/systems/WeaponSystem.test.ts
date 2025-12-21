@@ -3,6 +3,8 @@ import { World } from '@engine/ECS'
 import type { Entity } from '@engine/ECS'
 import { WeaponSystem } from './WeaponSystem'
 import { createWeapon, type Weapon } from '@components/Weapon'
+import { vi } from 'vitest'
+import { COMPONENTS } from '@engine/constants'
 
 describe('WeaponSystem', () => {
   let world: World
@@ -20,12 +22,12 @@ describe('WeaponSystem', () => {
     enemy = world.createEntity()
 
     // Add transform components
-    world.addComponent(player, 'transform' as any, { x: 0, y: 0, rotation: 0 })
-    world.addComponent(enemy, 'transform' as any, { x: 20, y: 0, rotation: 0 })
+    world.addComponent(player, COMPONENTS.TRANSFORM, { x: 0, y: 0, rotation: 0 })
+    world.addComponent(enemy, COMPONENTS.TRANSFORM, { x: 20, y: 0, rotation: 0 })
 
     // Add health components
-    world.addComponent(player, 'health' as any, { current: 100, max: 100 })
-    world.addComponent(enemy, 'health' as any, { current: 50, max: 50 })
+    world.addComponent(player, COMPONENTS.HEALTH, { current: 100, max: 100 })
+    world.addComponent(enemy, COMPONENTS.HEALTH, { current: 50, max: 50 })
 
     // Create sword
     sword = createWeapon('sword_1', 'Test Sword', 'sword', 15)
@@ -43,12 +45,12 @@ describe('WeaponSystem', () => {
     })
 
     it('should reduce target health on hit', () => {
-      const beforeHealth = world.getComponent(enemy, 'health' as any)?.current || 0
+      const beforeHealth = world.getComponent(enemy, COMPONENTS.HEALTH)?.current || 0
 
       const result = weaponSystem.executeAttack(player, enemy, sword)
 
       if (result.hit) {
-        const afterHealth = world.getComponent(enemy, 'health' as any)?.current || 0
+        const afterHealth = world.getComponent(enemy, COMPONENTS.HEALTH)?.current || 0
         expect(afterHealth).toBeLessThan(beforeHealth)
         expect(afterHealth).toBe(beforeHealth - result.damage)
       }
@@ -84,13 +86,13 @@ describe('WeaponSystem', () => {
 
   describe('applyDamage', () => {
     it('should reduce health', () => {
-      const before = world.getComponent(enemy, 'health' as any)?.current || 0
+      const before = world.getComponent(enemy, COMPONENTS.HEALTH)?.current || 0
       const remaining = weaponSystem.applyDamage(enemy, 10)
       expect(remaining).toBe(before - 10)
     })
 
     it('should not go below 0', () => {
-      world.addComponent(enemy, 'health' as any, { current: 5, max: 50 })
+      world.addComponent(enemy, COMPONENTS.HEALTH, { current: 5, max: 50 })
       const remaining = weaponSystem.applyDamage(enemy, 20)
       expect(remaining).toBe(0)
     })
@@ -153,32 +155,25 @@ describe('WeaponSystem', () => {
     })
 
     it('should return false after attack within cooldown', () => {
-      // Execute first attack
       weaponSystem.executeAttack(player, enemy, sword)
-
-      // Should not be ready immediately
       expect(weaponSystem.isAttackReady(player, sword)).toBe(false)
     })
 
-    it('should return true after cooldown elapsed', async () => {
+    it('should return true after cooldown elapsed', () => {
+      vi.useFakeTimers()
       const shortSword = createWeapon('sword_fast', 'Fast Sword', 'sword', 15)
       shortSword.attackSpeed = 10.0 // 60ms cooldown
-
-      // Execute attack and ensure it hits by trying multiple times if needed
       let result
       for (let i = 0; i < 10; i++) {
         result = weaponSystem.executeAttack(player, enemy, shortSword)
         if (result.hit) break
       }
-
-      // If attack hit, cooldown should be active
       if (result && result.hit) {
         expect(weaponSystem.isAttackReady(player, shortSword)).toBe(false)
+        vi.advanceTimersByTime(100)
+        expect(weaponSystem.isAttackReady(player, shortSword)).toBe(true)
       }
-
-      // Wait for cooldown
-      await new Promise(resolve => setTimeout(resolve, 100))
-      expect(weaponSystem.isAttackReady(player, shortSword)).toBe(true)
+      vi.useRealTimers()
     })
   })
 
@@ -189,15 +184,13 @@ describe('WeaponSystem', () => {
     })
 
     it('should return positive value after attack', () => {
-      // Use very fast weapon to avoid timing issues
+      vi.useFakeTimers()
       sword.attackSpeed = 100.0 // 6ms cooldown
-
       weaponSystem.executeAttack(player, enemy, sword)
       const time = weaponSystem.getTimeUntilAttackReady(player, sword)
-
-      // Time should be non-negative (0 or positive)
       expect(typeof time).toBe('number')
       expect(time).toBeGreaterThanOrEqual(0)
+      vi.useRealTimers()
     })
   })
 
@@ -240,24 +233,17 @@ describe('WeaponSystem', () => {
 
   describe('resetAttackCooldown', () => {
     it('should make attack ready immediately', () => {
-      // Use fast weapon to avoid timing issues
       sword.attackSpeed = 100.0 // 6ms cooldown
-
-      // Execute attacks until one hits (to ensure cooldown is set)
       let result
       for (let i = 0; i < 10; i++) {
         result = weaponSystem.executeAttack(player, enemy, sword)
         if (result.hit) break
       }
-
-      // Only test if we actually hit
       if (result && result.hit) {
         expect(weaponSystem.isAttackReady(player, sword)).toBe(false)
-
         weaponSystem.resetAttackCooldown(player)
         expect(weaponSystem.isAttackReady(player, sword)).toBe(true)
       } else {
-        // If no hits in 10 tries, skip test (very unlikely but possible)
         expect(true).toBe(true)
       }
     })
@@ -265,24 +251,18 @@ describe('WeaponSystem', () => {
 
   describe('clearAllAttackTimes', () => {
     it('should reset all attack cooldowns', () => {
+      vi.useFakeTimers()
       const player2 = world.createEntity()
       world.addComponent(player2, 'transform' as any, { x: 0, y: 0, rotation: 0 })
       world.addComponent(player2, 'health' as any, { current: 100, max: 100 })
-
-      // Use very fast weapon to avoid timing issues
       sword.attackSpeed = 100.0 // 6ms cooldown
-
       weaponSystem.executeAttack(player, enemy, sword)
       weaponSystem.executeAttack(player2, enemy, sword)
-
-      // Immediately check - should be in cooldown
       expect(weaponSystem.getWeaponCooldown(sword)).toBeGreaterThan(0)
-
       weaponSystem.clearAllAttackTimes()
-
-      // After clear, both should be ready
       expect(weaponSystem.isAttackReady(player, sword)).toBe(true)
       expect(weaponSystem.isAttackReady(player2, sword)).toBe(true)
+      vi.useRealTimers()
     })
   })
 
@@ -316,23 +296,22 @@ describe('WeaponSystem', () => {
 
   describe('Integration Tests', () => {
     it('should handle complete combat scenario', () => {
-      // Use fast weapon to avoid timing issues
+      vi.useFakeTimers()
       sword.attackSpeed = 100.0 // 6ms cooldown
 
       // Initial state
-      const initialEnemyHealth = world.getComponent(enemy, 'health' as any)?.current || 0
+      const initialEnemyHealth = world.getComponent(enemy, COMPONENTS.HEALTH)?.current || 0
       expect(initialEnemyHealth).toBe(50)
 
       // First attack
       let result = weaponSystem.executeAttack(player, enemy, sword)
-      let enemyHealth = world.getComponent(enemy, 'health' as any)?.current || 0
+      let enemyHealth = world.getComponent(enemy, COMPONENTS.HEALTH)?.current || 0
 
       if (result.hit) {
         expect(enemyHealth).toBeLessThan(initialEnemyHealth)
       }
 
       // Weapon should have cooldown (verify remaining time is > 0 or check not ready)
-      // With 6ms cooldown, timing issues arise, so just verify the attack was recorded
       expect(result.timestamp).toBeGreaterThan(0)
 
       // Reset cooldown
@@ -340,23 +319,27 @@ describe('WeaponSystem', () => {
 
       // Second attack
       result = weaponSystem.executeAttack(player, enemy, sword)
-      enemyHealth = world.getComponent(enemy, 'health' as any)?.current || 0
+      enemyHealth = world.getComponent(enemy, COMPONENTS.HEALTH)?.current || 0
 
       // Continue until break
-      while (sword.durability.current > 0 && enemyHealth > 0) {
+      let loopCount = 0
+      while (sword.durability.current > 0 && enemyHealth > 0 && loopCount < 100) {
         weaponSystem.resetAttackCooldown(player)
         result = weaponSystem.executeAttack(player, enemy, sword)
-        enemyHealth = world.getComponent(enemy, 'health' as any)?.current || 0
+        enemyHealth = world.getComponent(enemy, COMPONENTS.HEALTH)?.current || 0
+        loopCount++
       }
 
       // Enemy should be dead or weapon broken
       expect(enemyHealth === 0 || weaponSystem.isWeaponBroken(sword)).toBe(true)
+      vi.useRealTimers()
     })
 
     it('should support multiple attackers', () => {
+      vi.useFakeTimers()
       const player2 = world.createEntity()
-      world.addComponent(player2, 'transform' as any, { x: 0, y: 30, rotation: 0 })
-      world.addComponent(player2, 'health' as any, { current: 100, max: 100 })
+      world.addComponent(player2, COMPONENTS.TRANSFORM, { x: 0, y: 30, rotation: 0 })
+      world.addComponent(player2, COMPONENTS.HEALTH, { current: 100, max: 100 })
 
       // Use fast weapons to avoid timing issues
       sword.attackSpeed = 100.0 // Very fast cooldown (6ms)
@@ -368,7 +351,6 @@ describe('WeaponSystem', () => {
       weaponSystem.executeAttack(player2, enemy, sword2)
 
       // Immediately after, should be in cooldown
-      // (timing might vary, so just check they're tracked separately)
       expect(weaponSystem.getTimeUntilAttackReady(player, sword)).toBeGreaterThanOrEqual(0)
       expect(weaponSystem.getTimeUntilAttackReady(player2, sword2)).toBeGreaterThanOrEqual(0)
 
@@ -377,8 +359,10 @@ describe('WeaponSystem', () => {
       expect(weaponSystem.isAttackReady(player, sword)).toBe(true)
 
       // player2 attack time is separate from player
-      // After enough time, player2 should also be ready
+      // Simuliere Zeit für player2
+      vi.advanceTimersByTime(10)
       expect(weaponSystem.isAttackReady(player2, sword2)).toBe(true)
+      vi.useRealTimers()
     })
   })
 })

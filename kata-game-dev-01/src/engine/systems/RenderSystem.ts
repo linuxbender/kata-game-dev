@@ -1,5 +1,4 @@
-import type {Entity} from '@engine/ECS'
-import type {TypedWorld} from '@engine/componentTypes'
+import type {Entity, World} from '@engine/ECS'
 import {COMPONENTS} from '@engine/constants'
 import {applyDeadZone, CameraConfig, computeSmoothing, DEFAULT_CAMERA_CONFIG, lerp} from './CameraConfig'
 import {createEnemyVisualizationSystem} from './EnemyVisualizationSystem'
@@ -16,7 +15,7 @@ export type SpatialIndex = {
     query: (range: { x: number; y: number; w: number; h: number }) => { x: number; y: number; entity: number }[]
 }
 
-export type HudRenderer = (ctx: CanvasRenderingContext2D, world: TypedWorld, camX: number, camY: number, viewW: number, viewH: number, dpr: number) => void
+export type HudRenderer = (ctx: CanvasRenderingContext2D, world: World, camX: number, camY: number, viewW: number, viewH: number, dpr: number) => void
 
 // Render system factory: draws entities with smooth camera follow (dead zone + predictive).
 // Performs frustum culling and supports spatial indexing for large worlds.
@@ -40,7 +39,7 @@ export const createRenderSystem = (
     let camXTarget = 0
     let camYTarget = 0
 
-    const update = (world: TypedWorld, dt: number, canvasSize?: {
+    const update = (world: World, dt: number, canvasSize?: {
         width: number;
         height: number
     }, spatialIndex?: any) => {

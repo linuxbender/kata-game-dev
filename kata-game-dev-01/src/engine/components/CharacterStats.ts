@@ -95,6 +95,8 @@ export interface CharacterStats {
   level: number
   /** Experience needed for next level */
   experienceToNextLevel?: number
+  /** Bonus stats from equipment (e.g. attack, defense, etc.) */
+  bonus: Record<string, number>
 }
 
 /**
@@ -172,6 +174,7 @@ export function createDefaultStats(): CharacterStats {
     experience: 0,
     level: 1,
     experienceToNextLevel: 100,
+    bonus: {},
   }
 
   return stats
@@ -199,6 +202,7 @@ export function createCharacterStats(base: BaseStats, level: number = 1): Charac
     experience: 0,
     level,
     experienceToNextLevel: calculateExperienceForLevel(level + 1),
+    bonus: {},
   }
 
   return stats
@@ -443,4 +447,3 @@ export function getStatsSummary(stats: CharacterStats) {
     criticalChance: Math.round(stats.derived.criticalChance * 100),
   }
 }
-

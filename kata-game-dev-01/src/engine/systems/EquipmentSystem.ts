@@ -1,342 +1,144 @@
+import type { World } from '../ECS'
+import { COMPONENTS } from '@engine/constants'
+import { getItemDefinition } from '@game/configs/ItemConfig'
+import type { InventoryItem } from '@game/configs/ItemConfig'
+import { createDefaultStats } from '@engine/components/CharacterStats'
+
+/** Allowed equipment slots */
+export const EQUIPMENT_SLOTS = [
+  'mainHand',
+  'offHand',
+  'head',
+  'chest',
+  'legs',
+  'feet'
+] as const
+export type EquipmentSlot = (typeof EQUIPMENT_SLOTS)[number]
+
 /**
- * Equipment System
- *
- * Manages equipped gear and equipment slots.
- * Handles equipping, unequipping, and applying bonuses from equipment.
+ * Apply numeric item stats onto a stats object.
+ * Uses a multiplier (1 to add, -1 to remove).
  *
  * @example
+ * const stats = { attack: 5 }
+ * const sword = { stats: { attack: 8 } }
+ * applyItemStatsTo(stats, sword, 1) // stats.attack === 13
+ */
+const applyItemStatsTo = (stats: { bonus: Record<string, number> }, itemDef: any, mult = 1) => {
+  if (!itemDef || !itemDef.stats) return
+  for (const [k, v] of Object.entries(itemDef.stats)) {
+    if (typeof v === 'number') {
+      stats.bonus[k] = (stats.bonus[k] ?? 0) + v * mult
+    }
+  }
+}
+
+/**
+ * EquipmentSystem: provides helper operations to equip/unequip items for entities.
+ *
+ * Example usage:
  * ```ts
- * const equipment = new EquipmentSystem()
- *
- * // Equip item
- * equipment.equip(sword, 'mainHand')
- *
- * // Get equipped bonuses
- * const bonuses = equipment.getAllBonuses()
+ * const eq = new EquipmentSystem(world)
+ * eq.equip(playerId, 'mainHand', itemInstance)
+ * eq.unequip(playerId, 'mainHand')
  * ```
  */
-
-import { getItemBonuses, getActiveEffects, hasActiveEffects, type Item, type ItemBonus, type ItemEffect } from '@components/Item'
-
-/**
- * Equipment slot type.
- */
-export type EquipmentSlot = 'mainHand' | 'offHand' | 'head' | 'chest' | 'legs' | 'feet' | 'hands' | 'back' | 'neck' | 'ring1' | 'ring2'
-
-/**
- * Equipped item with metadata.
- */
-export interface EquippedItem {
-  item: Item
-  slot: EquipmentSlot
-  equippedAt: number
-}
-
-/**
- * Equipment System
- *
- * Manages character equipment and bonuses.
- */
 export class EquipmentSystem {
-  private equipment = new Map<EquipmentSlot, EquippedItem>()
+  world: World
+  constructor(world: World) {
+    this.world = world
+  }
 
-  private readonly slotValidation = new Map<EquipmentSlot, Item['type'][]>([
-    ['mainHand', ['weapon']],
-    ['offHand', ['weapon', 'armor', 'accessory']],
-    ['head', ['armor', 'accessory']],
-    ['chest', ['armor']],
-    ['legs', ['armor']],
-    ['feet', ['armor', 'accessory']],
-    ['hands', ['armor', 'accessory']],
-    ['back', ['armor', 'accessory']],
-    ['neck', ['accessory']],
-    ['ring1', ['accessory']],
-    ['ring2', ['accessory']],
-  ])
+  /** Check whether a slot name is valid */
+  isValidSlot = (slot: string): slot is EquipmentSlot => {
+    return EQUIPMENT_SLOTS.includes(slot as EquipmentSlot)
+  }
 
   /**
-   * Equip an item.
-   *
-   * @param item - Item to equip
-   * @param slot - Equipment slot
-   * @returns true if successfully equipped
+   * Equip an item instance (from inventory) into a given slot.
+   * Returns true if successful.
    *
    * @example
    * ```ts
-   * if (equipment.equip(sword, 'mainHand')) {
-   *   applyBonuses()
-   * }
+   * // assume `item` is an InventoryItem from player's inventory
+   * equipmentSystem.equip(playerId, 'mainHand', item)
    * ```
    */
-  equip(item: Item, slot: EquipmentSlot): boolean {
-    // Validate slot compatibility
-    const validTypes = this.slotValidation.get(slot)
-    if (!validTypes || !validTypes.includes(item.type)) {
-      return false
-    }
+  equip = (entity: number, slot: string, item: InventoryItem): boolean => {
+    if (!this.isValidSlot(slot)) return false
+    const def = getItemDefinition(item.id)
+    if (!def) return false
 
-    // Equip item
-    this.equipment.set(slot, {
-      item,
-      slot,
-      equippedAt: Date.now(),
-    })
+    // Only allow weapons in mainHand/offHand, armor in armor slots
+    if (def.type === 'weapon' && !['mainHand', 'offHand'].includes(slot)) return false
+    if (def.type === 'armor' && ['mainHand', 'offHand'].includes(slot)) return false
+
+    // read current equipment
+    const equipment = this.world.getComponent(entity, COMPONENTS.EQUIPMENT) || { slots: {} }
+
+    // place item uid into slot (unique instance reference)
+    equipment.slots = { ...(equipment.slots || {}), [slot]: item.uid }
+    this.world.addComponent(entity, COMPONENTS.EQUIPMENT, equipment)
+
+    // Update CharacterStats bonuses (create stats if missing)
+    const stats = this.world.getComponent(entity, COMPONENTS.CHARACTER_STATS) || createDefaultStats()
+    applyItemStatsTo(stats, def, +1)
+    this.world.addComponent(entity, COMPONENTS.CHARACTER_STATS, stats)
 
     return true
   }
 
   /**
-   * Unequip item from slot.
-   *
-   * @param slot - Equipment slot
-   * @returns Unequipped item or undefined
+   * Unequip an item from a slot; returns the uid of removed item or undefined.
    *
    * @example
    * ```ts
-   * const removed = equipment.unequip('mainHand')
+   * const removedUid = equipmentSystem.unequip(playerId, 'mainHand')
    * ```
    */
-  unequip(slot: EquipmentSlot): Item | undefined {
-    const equipped = this.equipment.get(slot)
-    if (!equipped) return undefined
+  unequip = (entity: number, slot: string): string | undefined => {
+    if (!this.isValidSlot(slot)) return undefined
+    const equipment = this.world.getComponent(entity, COMPONENTS.EQUIPMENT)
+    if (!equipment || !equipment.slots) return undefined
+    const uid = equipment.slots[slot as EquipmentSlot]
+    if (!uid) return undefined
 
-    this.equipment.delete(slot)
-    return equipped.item
-  }
+    // Clear slot
+    const newSlots = { ...(equipment.slots || {}) }
+    delete newSlots[slot as EquipmentSlot]
+    this.world.addComponent(entity, COMPONENTS.EQUIPMENT, { slots: newSlots })
 
-  /**
-   * Get equipped item in slot.
-   *
-   * @param slot - Equipment slot
-   * @returns Equipped item or undefined
-   *
-   * @example
-   * ```ts
-   * const sword = equipment.getEquipped('mainHand')
-   * ```
-   */
-  getEquipped(slot: EquipmentSlot): Item | undefined {
-    return this.equipment.get(slot)?.item
-  }
-
-  /**
-   * Check if slot is occupied.
-   *
-   * @param slot - Equipment slot
-   * @returns true if equipped
-   *
-   * @example
-   * ```ts
-   * if (equipment.isEquipped('mainHand')) {
-   *   unequipFirst()
-   * }
-   * ```
-   */
-  isEquipped(slot: EquipmentSlot): boolean {
-    return this.equipment.has(slot)
-  }
-
-  /**
-   * Get all equipped items.
-   *
-   * @returns Array of equipped items
-   *
-   * @example
-   * ```ts
-   * const all = equipment.getAllEquipped()
-   * ```
-   */
-  getAllEquipped(): EquippedItem[] {
-    return Array.from(this.equipment.values())
-  }
-
-  /**
-   * Get all stat bonuses from equipped items.
-   *
-   * @returns Combined bonuses
-   *
-   * @example
-   * ```ts
-   * const bonuses = equipment.getAllBonuses()
-   * applyBonuses(character, bonuses)
-   * ```
-   */
-  getAllBonuses(): ItemBonus[] {
-    const bonuses: ItemBonus[] = []
-
-    this.equipment.forEach(equipped => {
-      const itemBonuses = getItemBonuses(equipped.item)
-      bonuses.push(...itemBonuses)
-    })
-
-    return bonuses
-  }
-
-  /**
-   * Get bonus for specific stat.
-   *
-   * @param stat - Stat type
-   * @returns Total bonus amount
-   *
-   * @example
-   * ```ts
-   * const strengthBonus = equipment.getStatBonus('strength')
-   * ```
-   */
-  getStatBonus(stat: ItemBonus['stat']): number {
-    return this.getAllBonuses()
-      .filter(b => b.stat === stat)
-      .reduce((total, b) => total + b.amount, 0)
-  }
-
-  /**
-   * Get all active effects from equipment.
-   *
-   * @returns Array of active effects
-   *
-   * @example
-   * ```ts
-   * const effects = equipment.getActiveEffects()
-   * ```
-   */
-  getActiveEffects(): ItemEffect[] {
-    const effects: ItemEffect[] = []
-
-    this.equipment.forEach(equipped => {
-      if (hasActiveEffects(equipped.item)) {
-        const active = getActiveEffects(equipped.item)
-        effects.push(...active)
-      }
-    })
-
-    return effects
-  }
-
-  /**
-   * Get total equipment weight.
-   *
-   * @returns Total weight
-   *
-   * @example
-   * ```ts
-   * const weight = equipment.getTotalWeight()
-   * ```
-   */
-  getTotalWeight(): number {
-    return Array.from(this.equipment.values()).reduce((total, e) => total + e.item.weight, 0)
-  }
-
-  /**
-   * Get total equipment value.
-   *
-   * @returns Total value
-   *
-   * @example
-   * ```ts
-   * const worth = equipment.getTotalValue()
-   * ```
-   */
-  getTotalValue(): number {
-    return Array.from(this.equipment.values()).reduce((total, e) => total + e.item.value, 0)
-  }
-
-  /**
-   * Get equipment status.
-   *
-   * @returns Status information
-   *
-   * @example
-   * ```ts
-   * const status = equipment.getStatus()
-   * console.log(`${status.equipped}/${status.maxSlots} slots used`)
-   * ```
-   */
-  getStatus() {
-    return {
-      equipped: this.equipment.size,
-      maxSlots: this.slotValidation.size,
-      weight: this.getTotalWeight(),
-      value: this.getTotalValue(),
-      bonusCount: this.getAllBonuses().length,
-      activeEffectCount: this.getActiveEffects().length,
+    // Reverse stats using item definition by uid->id
+    const inv = this.world.getComponent(entity, COMPONENTS.INVENTORY) as InventoryItem[] | undefined
+    const entry = inv?.find(i => i.uid === uid)
+    const def = entry ? getItemDefinition(entry.id) : undefined
+    if (def) {
+      const stats = this.world.getComponent(entity, COMPONENTS.CHARACTER_STATS) || createDefaultStats()
+      applyItemStatsTo(stats, def, -1)
+      this.world.addComponent(entity, COMPONENTS.CHARACTER_STATS, stats)
     }
+
+    return uid
   }
 
   /**
-   * Swap equipment between slots.
-   *
-   * @param slot1 - First slot
-   * @param slot2 - Second slot
-   * @returns true if successfully swapped
+   * Swap two equipment slots (e.g., mainHand <-> offHand).
+   * Returns true if swapped.
    *
    * @example
    * ```ts
-   * equipment.swap('mainHand', 'offHand')
+   * equipmentSystem.swapSlots(playerId, 'mainHand', 'offHand')
    * ```
    */
-  swap(slot1: EquipmentSlot, slot2: EquipmentSlot): boolean {
-    const item1 = this.equipment.get(slot1)
-    const item2 = this.equipment.get(slot2)
-
-    if (!item1 || !item2) return false
-
-    const validTypes1 = this.slotValidation.get(slot2)
-    const validTypes2 = this.slotValidation.get(slot1)
-
-    if (!validTypes1 || !validTypes1.includes(item1.item.type)) return false
-    if (!validTypes2 || !validTypes2.includes(item2.item.type)) return false
-
-    this.equipment.set(slot1, { ...item2, slot: slot1 })
-    this.equipment.set(slot2, { ...item1, slot: slot2 })
-
+  swapSlots = (entity: number, slotA: string, slotB: string): boolean => {
+    if (!this.isValidSlot(slotA) || !this.isValidSlot(slotB)) return false
+    const equipment = this.world.getComponent(entity, COMPONENTS.EQUIPMENT) || { slots: {} }
+    const a = equipment.slots?.[slotA]
+    const b = equipment.slots?.[slotB]
+    equipment.slots = { ...(equipment.slots || {}), [slotA]: b, [slotB]: a }
+    this.world.addComponent(entity, COMPONENTS.EQUIPMENT, equipment)
     return true
-  }
-
-  /**
-   * Clear all equipment.
-   *
-   * @returns Array of unequipped items
-   *
-   * @example
-   * ```ts
-   * const items = equipment.clear()
-   * items.forEach(item => inventory.addItem(item))
-   * ```
-   */
-  clear(): Item[] {
-    const items = Array.from(this.equipment.values()).map(e => e.item)
-    this.equipment.clear()
-    return items
-  }
-
-  /**
-   * Get equipment by type.
-   *
-   * @param type - Item type
-   * @returns Matching equipped items
-   *
-   * @example
-   * ```ts
-   * const armor = equipment.getByType('armor')
-   * ```
-   */
-  getByType(type: Item['type']): EquippedItem[] {
-    return Array.from(this.equipment.values()).filter(e => e.item.type === type)
-  }
-
-  /**
-   * Get available slots.
-   *
-   * @returns Array of empty slot names
-   *
-   * @example
-   * ```ts
-   * const available = equipment.getAvailableSlots()
-   * ```
-   */
-  getAvailableSlots(): EquipmentSlot[] {
-    const slots = Array.from(this.slotValidation.keys())
-    return slots.filter(slot => !this.equipment.has(slot)) as EquipmentSlot[]
   }
 }
 
+export default EquipmentSystem

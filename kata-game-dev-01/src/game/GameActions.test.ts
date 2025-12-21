@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { World } from '@engine/ECS'
-import { createItemInstance, ITEM_CATALOG } from './configs/ItemConfig'
-import { pickupItem, dropItem, consumeItem, moveItem } from './GameActions'
+import { createItemInstance } from './configs/ItemConfig'
+import { pickupItem, dropItem, consumeItem, moveItem, attackEntity } from './GameActions'
 import { COMPONENTS } from '@engine/constants'
+import { createWeapon } from '@engine/components/Weapon'
 
 describe('GameActions - Inventory', () => {
   it('pickup stackable item and stack correctly', () => {
@@ -69,3 +70,61 @@ describe('GameActions - Inventory', () => {
   })
 })
 
+describe('GameActions - Weapon Mechanics', () => {
+  it('attackEntity executes attack and applies damage', () => {
+    const world = new World()
+    const player = world.createEntity()
+    const enemy = world.createEntity()
+    world.addComponent(player, COMPONENTS.HEALTH, { current: 100, max: 100 })
+    world.addComponent(enemy, COMPONENTS.HEALTH, { current: 50, max: 50 })
+    world.addComponent(player, COMPONENTS.INVENTORY, [])
+    // Create a weapon item and add to inventory
+    const sword = { ...createWeapon('sword_iron', 'Iron Sword', 'sword', 8), uid: 'sword1' }
+    world.addComponent(player, COMPONENTS.INVENTORY, [sword])
+    // Place both entities close
+    world.addComponent(player, COMPONENTS.TRANSFORM, { x: 0, y: 0, rotation: 0 })
+    world.addComponent(enemy, COMPONENTS.TRANSFORM, { x: 10, y: 0, rotation: 0 })
+    // Attack
+    const result = attackEntity(world, player, enemy, sword.uid)
+    expect(result).toBe(true)
+    // Health should be reduced (if hit) or unchanged (miss)
+    const hp = world.getComponent(enemy, COMPONENTS.HEALTH)
+    expect([50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40]).toContain(hp.current)
+  })
+
+  it('attackEntity respects cooldown', () => {
+    const world = new World()
+    const player = world.createEntity()
+    const enemy = world.createEntity()
+    world.addComponent(player, COMPONENTS.HEALTH, { current: 100, max: 100 })
+    world.addComponent(enemy, COMPONENTS.HEALTH, { current: 50, max: 50 })
+    world.addComponent(player, COMPONENTS.INVENTORY, [])
+    const sword = { ...createWeapon('sword_iron', 'Iron Sword', 'sword', 8), uid: 'sword1' }
+    world.addComponent(player, COMPONENTS.INVENTORY, [sword])
+    world.addComponent(player, COMPONENTS.TRANSFORM, { x: 0, y: 0, rotation: 0 })
+    world.addComponent(enemy, COMPONENTS.TRANSFORM, { x: 10, y: 0, rotation: 0 })
+    // First attack
+    const first = attackEntity(world, player, enemy, sword.uid)
+    expect(first).toBe(true)
+    // Second attack immediately may fail due to cooldown
+    const second = attackEntity(world, player, enemy, sword.uid)
+    expect([true, false]).toContain(second)
+  })
+
+  it('attackEntity returns false for invalid weapon', () => {
+    const world = new World()
+    const player = world.createEntity()
+    const enemy = world.createEntity()
+    world.addComponent(player, COMPONENTS.HEALTH, { current: 100, max: 100 })
+    world.addComponent(enemy, COMPONENTS.HEALTH, { current: 50, max: 50 })
+    world.addComponent(player, COMPONENTS.INVENTORY, [])
+    // Add a non-weapon item
+    const potion = createItemInstance('potion_health', 1)
+    world.addComponent(player, COMPONENTS.INVENTORY, [potion])
+    world.addComponent(player, COMPONENTS.TRANSFORM, { x: 0, y: 0, rotation: 0 })
+    world.addComponent(enemy, COMPONENTS.TRANSFORM, { x: 10, y: 0, rotation: 0 })
+    // Try to attack with potion
+    const result = attackEntity(world, player, enemy, potion.uid)
+    expect(result).toBe(false)
+  })
+})

@@ -216,7 +216,7 @@ export function useWorldQueryFilter(
       return
     }
 
-    let timeoutId: NodeJS.Timeout | null = null
+    let timeoutId: number | null = null
     let isMounted = true
 
     const updateQuery = () => {
@@ -227,7 +227,7 @@ export function useWorldQueryFilter(
         clearTimeout(timeoutId)
       }
 
-      timeoutId = setTimeout(() => {
+      timeoutId = window.setTimeout(() => {
         if (!isMounted) return
         const allEntities = world.getAllEntities ? world.getAllEntities() : []
         const filtered = allEntities.filter(filter)
@@ -257,4 +257,3 @@ export function useWorldQueryFilter(
 
   return entities
 }
-
