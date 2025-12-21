@@ -1,7 +1,9 @@
 import type { World } from '@engine/ECS'
 import { COMPONENTS } from '@engine/constants'
 import type { InventoryItem } from './configs/ItemConfig'
-import { getItemDefinition } from './configs/ItemConfig'
+import { getItemDefinition, createItemInstance } from './configs/ItemConfig'
+import { getDialogTree, getDialogNode } from './configs/DialogConfig'
+import type { DialogConsequence } from './configs/DialogConfig'
 import EquipmentSystem from '@engine/systems/EquipmentSystem'
 import { WeaponSystem } from '@engine/systems/WeaponSystem'
 
@@ -236,6 +238,188 @@ export const loadGameState = (world: World, slotNumber: number) => {
   return loadGame(world, slotNumber)
 }
 
+/**
+ * Start a dialog with an NPC
+ * @param world - The game world
+ * @param player - Player entity
+ * @param npc - NPC entity
+ * @param dialogTreeId - ID of the dialog tree to start
+ * @returns true if dialog started successfully
+ * @example
+ * startDialog(world, player, npcEntity, 'merchant_dialog')
+ */
+export const startDialog = (
+  world: World,
+  player: number,
+  npc: number,
+  dialogTreeId: string
+): boolean => {
+  const dialogTree = getDialogTree(dialogTreeId)
+  
+  if (!dialogTree) {
+    console.warn(`[startDialog] Dialog tree not found: ${dialogTreeId}`)
+    return false
+  }
+
+  // Initialize dialog state on player
+  const dialogState = {
+    active: true,
+    treeId: dialogTreeId,
+    currentNodeId: dialogTree.startNodeId,
+    npcEntity: npc
+  }
+
+  world.addComponent(player, COMPONENTS.DIALOG_STATE, dialogState)
+  return true
+}
+
+/**
+ * Choose a dialog option and navigate to the next node
+ * @param world - The game world
+ * @param player - Player entity
+ * @param choiceIndex - Index of the chosen option
+ * @returns true if choice was processed successfully
+ * @example
+ * chooseDialogOption(world, player, 0)
+ */
+export const chooseDialogOption = (
+  world: World,
+  player: number,
+  choiceIndex: number
+): boolean => {
+  const dialogState = world.getComponent(player, COMPONENTS.DIALOG_STATE) as any
+  
+  if (!dialogState || !dialogState.active) {
+    console.warn('[chooseDialogOption] No active dialog')
+    return false
+  }
+
+  const currentNode = getDialogNode(dialogState.treeId, dialogState.currentNodeId)
+  
+  if (!currentNode) {
+    console.warn('[chooseDialogOption] Current node not found')
+    return false
+  }
+
+  if (choiceIndex < 0 || choiceIndex >= currentNode.choices.length) {
+    console.warn('[chooseDialogOption] Invalid choice index')
+    return false
+  }
+
+  const choice = currentNode.choices[choiceIndex]
+  const nextNode = getDialogNode(dialogState.treeId, choice.nextNodeId)
+  
+  if (!nextNode) {
+    console.warn('[chooseDialogOption] Next node not found')
+    return false
+  }
+
+  // Process consequences of the next node
+  if (nextNode.consequences) {
+    processDialogConsequences(world, player, nextNode.consequences)
+  }
+
+  // Check if dialog should end
+  const shouldEnd = nextNode.consequences?.some(c => c.type === 'endDialog')
+  
+  if (shouldEnd) {
+    // End dialog
+    world.removeComponent(player, COMPONENTS.DIALOG_STATE)
+  } else {
+    // Update dialog state to next node
+    const newDialogState = {
+      ...dialogState,
+      currentNodeId: choice.nextNodeId
+    }
+    world.addComponent(player, COMPONENTS.DIALOG_STATE, newDialogState)
+  }
+
+  return true
+}
+
+/**
+ * Process dialog consequences (giveItems, setQuestFlag, etc)
+ * @param world - The game world
+ * @param player - Player entity
+ * @param consequences - Array of consequences to process
+ */
+const processDialogConsequences = (
+  world: World,
+  player: number,
+  consequences: DialogConsequence[]
+): void => {
+  for (const consequence of consequences) {
+    switch (consequence.type) {
+      case 'giveItems':
+        if (consequence.items) {
+          for (const item of consequence.items) {
+            const itemInstance = createItemInstance(item.id, item.quantity)
+            pickupItem(world, player, itemInstance)
+          }
+        }
+        break
+
+      case 'removeItems':
+        if (consequence.items) {
+          for (const item of consequence.items) {
+            const inv = world.getComponent(player, COMPONENTS.INVENTORY) as InventoryItem[] | undefined
+            if (inv) {
+              const invItem = inv.find(i => i.id === item.id)
+              if (invItem) {
+                dropItem(world, player, invItem.uid, item.quantity)
+              }
+            }
+          }
+        }
+        break
+
+      case 'setQuestFlag':
+        if (consequence.flag) {
+          // Get or create quest flags component
+          let questFlags = world.getComponent(player, COMPONENTS.QUEST_FLAGS) as Record<string, any> | undefined
+          if (!questFlags) {
+            questFlags = {}
+          }
+          
+          questFlags[consequence.flag.key] = consequence.flag.value
+          world.addComponent(player, COMPONENTS.QUEST_FLAGS, questFlags)
+        }
+        break
+
+      case 'endDialog':
+        // Handled in chooseDialogOption
+        break
+
+      default:
+        console.warn(`[processDialogConsequences] Unknown consequence type: ${consequence.type}`)
+    }
+  }
+}
+
+/**
+ * End the current dialog
+ * @param world - The game world
+ * @param player - Player entity
+ * @example
+ * endDialog(world, player)
+ */
+export const endDialog = (world: World, player: number): void => {
+  world.removeComponent(player, COMPONENTS.DIALOG_STATE)
+}
+
+/**
+ * Get current dialog state
+ * @param world - The game world
+ * @param player - Player entity
+ * @returns Dialog state or undefined
+ * @example
+ * const state = getDialogState(world, player)
+ * if (state?.active) { ... }
+ */
+export const getDialogState = (world: World, player: number): any => {
+  return world.getComponent(player, COMPONENTS.DIALOG_STATE)
+}
+
 export default {
   pickupItem,
   dropItem,
@@ -246,5 +430,9 @@ export default {
   swapEquipment,
   attackEntity,
   saveGameState,
-  loadGameState
+  loadGameState,
+  startDialog,
+  chooseDialogOption,
+  endDialog,
+  getDialogState
 }

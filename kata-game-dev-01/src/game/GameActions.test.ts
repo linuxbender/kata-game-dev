@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { World } from '@engine/ECS'
 import { createItemInstance } from './configs/ItemConfig'
-import { pickupItem, dropItem, consumeItem, moveItem, attackEntity } from './GameActions'
+import { 
+  pickupItem, 
+  dropItem, 
+  consumeItem, 
+  moveItem, 
+  attackEntity,
+  startDialog,
+  chooseDialogOption,
+  endDialog,
+  getDialogState
+} from './GameActions'
 import { COMPONENTS } from '@engine/constants'
 import { createWeapon } from '@engine/components/Weapon'
 
@@ -125,6 +135,150 @@ describe('GameActions - Weapon Mechanics', () => {
     world.addComponent(enemy, COMPONENTS.TRANSFORM, { x: 10, y: 0, rotation: 0 })
     // Try to attack with potion
     const result = attackEntity(world, player, enemy, potion.uid)
+    expect(result).toBe(false)
+  })
+})
+
+describe('GameActions - Dialog System', () => {
+  it('startDialog initializes dialog state', () => {
+    // Using imported startDialog
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    const result = startDialog(world, player, npc, 'merchant_dialog')
+    expect(result).toBe(true)
+    
+    const dialogState = world.getComponent(player, COMPONENTS.DIALOG_STATE)
+    expect(dialogState).toBeDefined()
+    expect(dialogState.active).toBe(true)
+    expect(dialogState.treeId).toBe('merchant_dialog')
+    expect(dialogState.currentNodeId).toBe('greeting')
+    expect(dialogState.npcEntity).toBe(npc)
+  })
+
+  it('startDialog returns false for invalid dialog tree', () => {
+    // Using imported startDialog
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    const result = startDialog(world, player, npc, 'nonexistent_dialog')
+    expect(result).toBe(false)
+  })
+
+  it('chooseDialogOption navigates to next node', () => {
+    // Using imported functions
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    startDialog(world, player, npc, 'merchant_dialog')
+    
+    // Choose first option (shop)
+    const result = chooseDialogOption(world, player, 0)
+    expect(result).toBe(true)
+    
+    const dialogState = getDialogState(world, player)
+    expect(dialogState.currentNodeId).toBe('shop')
+  })
+
+  it('chooseDialogOption processes giveItems consequence', () => {
+    // Using imported functions
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    world.addComponent(player, COMPONENTS.INVENTORY, [])
+    
+    startDialog(world, player, npc, 'merchant_dialog')
+    
+    // Navigate to shop
+    chooseDialogOption(world, player, 0)
+    
+    // Choose "I need some healing potions" (buy_potions)
+    chooseDialogOption(world, player, 0)
+    
+    // Check that potions were added to inventory
+    const inv = world.getComponent(player, COMPONENTS.INVENTORY) as any[]
+    expect(inv).toBeDefined()
+    expect(inv.length).toBeGreaterThan(0)
+    const potionItem = inv.find((item: any) => item.id === 'potion_health')
+    expect(potionItem).toBeDefined()
+    expect(potionItem.quantity).toBe(2)
+  })
+
+  it('chooseDialogOption processes setQuestFlag consequence', () => {
+    // Using imported functions
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    startDialog(world, player, npc, 'merchant_dialog')
+    
+    // Navigate to news
+    chooseDialogOption(world, player, 1)
+    
+    // Choose "Tell me more"
+    chooseDialogOption(world, player, 1)
+    
+    // Choose "I'll put a stop to them" (quest_accept)
+    chooseDialogOption(world, player, 0)
+    
+    // Check that quest flag was set
+    const questFlags = world.getComponent(player, COMPONENTS.QUEST_FLAGS) as any
+    expect(questFlags).toBeDefined()
+    expect(questFlags.orc_fortress_quest).toBe('accepted')
+  })
+
+  it('chooseDialogOption ends dialog with endDialog consequence', () => {
+    // Using imported functions
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    startDialog(world, player, npc, 'merchant_dialog')
+    
+    // Choose "Goodbye" which leads to goodbye node with endDialog consequence
+    chooseDialogOption(world, player, 2)
+    
+    // Dialog should be ended
+    const dialogState = getDialogState(world, player)
+    expect(dialogState).toBeUndefined()
+  })
+
+  it('endDialog removes dialog state', () => {
+    // Using imported functions
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    startDialog(world, player, npc, 'merchant_dialog')
+    expect(getDialogState(world, player)).toBeDefined()
+    
+    endDialog(world, player)
+    expect(getDialogState(world, player)).toBeUndefined()
+  })
+
+  it('chooseDialogOption returns false for invalid choice index', () => {
+    // Using imported functions
+    const world = new World()
+    const player = world.createEntity()
+    const npc = world.createEntity()
+    
+    startDialog(world, player, npc, 'merchant_dialog')
+    
+    // Try invalid choice index
+    const result = chooseDialogOption(world, player, 999)
+    expect(result).toBe(false)
+  })
+
+  it('chooseDialogOption returns false when no active dialog', () => {
+    // Using imported chooseDialogOption
+    const world = new World()
+    const player = world.createEntity()
+    
+    const result = chooseDialogOption(world, player, 0)
     expect(result).toBe(false)
   })
 })
