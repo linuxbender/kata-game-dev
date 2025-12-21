@@ -41,6 +41,16 @@ const App = () => {
   const [inventoryVersion, setInventoryVersion] = useState(0)
   const [saveLoadVisible, setSaveLoadVisible] = useState(false)
   
+  // Refs to track current state for keyboard handlers
+  const inventoryVisibleRef = useRef(inventoryVisible)
+  const equipmentVisibleRef = useRef(equipmentVisible)
+  const saveLoadVisibleRef = useRef(saveLoadVisible)
+  
+  // Keep refs in sync with state
+  React.useEffect(() => { inventoryVisibleRef.current = inventoryVisible }, [inventoryVisible])
+  React.useEffect(() => { equipmentVisibleRef.current = equipmentVisible }, [equipmentVisible])
+  React.useEffect(() => { saveLoadVisibleRef.current = saveLoadVisible }, [saveLoadVisible])
+  
   // Level transition state
   const [transitionActive, setTransitionActive] = useState(false)
   const [transitionLevel, setTransitionLevel] = useState<{ name: string; description: string } | null>(null)
@@ -205,12 +215,13 @@ const App = () => {
       // ESC key handler to close all overlays/modals
       const escapeKey = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
+          e.preventDefault()
           // Close overlays in order of priority (modals first, then overlays)
-          if (saveLoadVisible) {
+          if (saveLoadVisibleRef.current) {
             setSaveLoadVisible(false)
-          } else if (inventoryVisible) {
+          } else if (inventoryVisibleRef.current) {
             setInventoryVisible(false)
-          } else if (equipmentVisible) {
+          } else if (equipmentVisibleRef.current) {
             setEquipmentVisible(false)
           }
         }
