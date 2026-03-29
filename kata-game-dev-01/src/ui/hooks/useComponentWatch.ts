@@ -54,36 +54,16 @@ export function useComponentWatch<T = any>(
     if (!world || entity === null) return
 
     // Subscribe to component changes
-    const unsubscribe = world.onComponentChange<T>(componentName, (e, comp, type) => {
-      // debug
-      try {
-        console.debug('[useComponentWatch] event', String(componentName), 'entity', e, 'type', type, 'component', comp)
-      } catch {}
-      // Only update if this is our entity
+    const unsubscribe = world.onComponentChange<T>(componentName, (e, comp) => {
       if (e === entity) {
         setComponent(comp as T | undefined)
       }
     })
 
-    // Get current value in case it changed before subscription
-    const current = world.getComponent(entity, componentName) as T | undefined
-    setComponent(current)
+    // Sync current value in case it changed before subscription was established
+    setComponent(world.getComponent(entity, componentName) as T | undefined)
 
-    // Polling fallback to cover missed events (lightweight)
-    const poll = setInterval(() => {
-      try {
-        const now = world.getComponent(entity, componentName) as T | undefined
-        setComponent(now)
-      } catch {
-        // ignore
-      }
-    }, 250)
-
-    // Cleanup on unmount
-    return () => {
-      clearInterval(poll)
-      unsubscribe()
-    }
+    return unsubscribe
   }, [world, entity, componentName])
 
   return component

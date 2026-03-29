@@ -85,16 +85,16 @@ describe('EntityBlueprints', () => {
       expect(components.health).toBeDefined()
       expect(components.inventory).toBeDefined()
       expect(components.equipment).toBeDefined()
-      expect(components.stats).toBeDefined()
+      expect(components.characterStats).toBeDefined()
     })
 
     it('player should have correct default values', () => {
-      const { transform, health, stats } = PLAYER_BLUEPRINT.components
+      const { transform, health, characterStats } = PLAYER_BLUEPRINT.components
       expect(transform.x).toBe(200)
       expect(transform.y).toBe(200)
       expect(health.current).toBe(100)
       expect(health.max).toBe(100)
-      expect(stats.level).toBe(1)
+      expect(characterStats.level).toBe(1)
     })
 
     it('enemies should have AI component', () => {
@@ -372,8 +372,8 @@ describe('EntityBlueprints', () => {
       // Overridden
       expect(toughPlayer.components.health.max).toBe(200)
       // Unchanged
-      expect(toughPlayer.components.inventory.maxSlots).toBe(20)
-      expect(toughPlayer.components.stats.level).toBe(1)
+      expect(Array.isArray(toughPlayer.components.inventory)).toBe(true)
+      expect(toughPlayer.components.characterStats.level).toBe(1)
     })
 
     it('should handle blueprint queries by type', () => {
@@ -485,13 +485,12 @@ describe('EntityBlueprints', () => {
     it('should ensure player starts with empty inventory', () => {
       const playerInventory = PLAYER_BLUEPRINT.components.inventory
 
-      expect(playerInventory.items).toBeDefined()
-      expect(Array.isArray(playerInventory.items)).toBe(true)
-      expect(playerInventory.items.length).toBe(0)
+      expect(Array.isArray(playerInventory)).toBe(true)
+      expect(playerInventory.length).toBe(0)
     })
 
     it('should provide reasonable stat progression starting values', () => {
-      const playerStats = PLAYER_BLUEPRINT.components.stats
+      const playerStats = PLAYER_BLUEPRINT.components.characterStats
 
       expect(playerStats.level).toBe(1)
       expect(playerStats.experience).toBe(0)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import './LevelTransition.css'
 
 export interface LevelTransitionProps {
@@ -33,43 +33,31 @@ export const LevelTransition: React.FC<LevelTransitionProps> = ({
 }) => {
   const [phase, setPhase] = useState<'fade-in' | 'hold' | 'fade-out' | 'hidden'>('hidden')
 
+  // Keep onComplete in a ref so changing the callback never restarts the timers.
+  // Only isActive and duration should control the timer lifecycle.
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
+
   useEffect(() => {
     if (!isActive) {
       setPhase('hidden')
       return
     }
 
-    // Start transition sequence
+    const fadeIn  = duration * 0.4
+    const hold    = duration * 0.2
+    const fadeOut = duration * 0.4
+
     setPhase('fade-in')
-
-    // Fade in duration (40% of total)
-    const fadeInDuration = duration * 0.4
-    // Hold duration (20% of total)
-    const holdDuration = duration * 0.2
-    // Fade out duration (40% of total)
-    const fadeOutDuration = duration * 0.4
-
-    const timer1 = setTimeout(() => {
-      setPhase('hold')
-    }, fadeInDuration)
-
-    const timer2 = setTimeout(() => {
-      setPhase('fade-out')
-    }, fadeInDuration + holdDuration)
-
-    const timer3 = setTimeout(() => {
+    const t1 = setTimeout(() => setPhase('hold'),     fadeIn)
+    const t2 = setTimeout(() => setPhase('fade-out'), fadeIn + hold)
+    const t3 = setTimeout(() => {
       setPhase('hidden')
-      if (onComplete) {
-        onComplete()
-      }
-    }, fadeInDuration + holdDuration + fadeOutDuration)
+      onCompleteRef.current?.()
+    }, fadeIn + hold + fadeOut)
 
-    return () => {
-      clearTimeout(timer1)
-      clearTimeout(timer2)
-      clearTimeout(timer3)
-    }
-  }, [isActive, duration, onComplete])
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [isActive, duration])
 
   if (phase === 'hidden') {
     return null

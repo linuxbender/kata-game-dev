@@ -93,7 +93,7 @@ export const DebugOverlay: React.FC<DebugOverlayProps> = ({
   if (!isVisible) {
     return (
       <div className="debug-overlay-hint">
-        <span>Press 'D' to toggle debug overlay</span>
+        <span>Press 'F3' to toggle debug overlay</span>
       </div>
     )
   }
@@ -291,7 +291,7 @@ export const DebugOverlay: React.FC<DebugOverlayProps> = ({
       </div>
 
       <div className="debug-overlay-footer">
-        <span>Press 'D' to toggle</span>
+        <span>Press 'F3' to toggle</span>
       </div>
     </div>
   )

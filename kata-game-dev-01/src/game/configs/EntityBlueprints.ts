@@ -93,17 +93,14 @@ export const PLAYER_BLUEPRINT: EntityBlueprint = {
       max: 100,
       regeneration: 0.5,
     },
-    inventory: {
-      maxSlots: 20,
-      items: [],
-    },
+    inventory: [],
     equipment: {
       slots: {
         mainHand: undefined,
         offHand: undefined,
       },
     },
-    stats: {
+    characterStats: {
       level: 1,
       experience: 0,
       experienceToNextLevel: 100,
@@ -299,6 +296,7 @@ export const MERCHANT_BLUEPRINT: EntityBlueprint = {
     },
     metadata: {
       isNPC: true,
+      dialogTreeId: 'merchant_dialog',
     },
   },
 }

@@ -45,7 +45,7 @@ describe('DebugOverlay', () => {
         />
       )
       
-      expect(screen.getByText("Press 'D' to toggle debug overlay")).toBeDefined()
+      expect(screen.getByText("Press 'F3' to toggle debug overlay")).toBeDefined()
     })
 
     it('should show overlay when visible', () => {
@@ -82,7 +82,7 @@ describe('DebugOverlay', () => {
         />
       )
       
-      const footer = screen.getAllByText("Press 'D' to toggle")
+      const footer = screen.getAllByText("Press 'F3' to toggle")
       expect(footer.length).toBeGreaterThan(0)
     })
   })

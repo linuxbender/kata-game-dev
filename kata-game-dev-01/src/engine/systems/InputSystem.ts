@@ -50,8 +50,8 @@ export interface InputSystemConfig {
  */
 export const createInputSystem = (config: Partial<InputSystemConfig> = {}) => {
   const mapping: InputMapping = config.mapping || DEFAULT_INPUT_MAPPING
-  const movementSpeed = config.movementSpeed ?? 150
-  const enableDiagonalNormalization = config.enableDiagonalNormalization ?? true
+  let movementSpeed = config.movementSpeed ?? 150
+  let enableDiagonalNormalization = config.enableDiagonalNormalization ?? true
 
   // Track currently pressed keys
   const pressedKeys = new Set<string>()
@@ -142,9 +142,9 @@ export const createInputSystem = (config: Partial<InputSystemConfig> = {}) => {
   // Update configuration at runtime (for HUD settings)
   const updateConfig = (newConfig: Partial<InputSystemConfig>) => {
     if (newConfig.mapping) Object.assign(mapping, newConfig.mapping)
-    if (newConfig.movementSpeed !== undefined) Object.assign({ movementSpeed: newConfig.movementSpeed })
+    if (newConfig.movementSpeed !== undefined) movementSpeed = newConfig.movementSpeed
     if (newConfig.enableDiagonalNormalization !== undefined) {
-      Object.assign({ enableDiagonalNormalization: newConfig.enableDiagonalNormalization })
+      enableDiagonalNormalization = newConfig.enableDiagonalNormalization
     }
   }
 

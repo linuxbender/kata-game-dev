@@ -148,13 +148,12 @@ export const createWorld = (worldInstance?: World): {
   // 1. Create and setup player
   const player = world.createEntity()
   instantiateBlueprint(world, PLAYER_BLUEPRINT, player)
-  // Füge Iron Sword ins Inventory hinzu
-  let inventory = world.getComponent(player, COMPONENTS.INVENTORY)
-  if (!Array.isArray(inventory)) inventory = []
+  // Add starting weapon to inventory
+  const inventory = (world.getComponent(player, COMPONENTS.INVENTORY) as any[]) ?? []
   const sword = createItemInstance('sword_iron', 1)
   inventory.push(sword)
   world.addComponent(player, COMPONENTS.INVENTORY, inventory)
-  // Rüste das Schwert im mainHand aus
+  // Equip sword in main hand
   world.addComponent(player, COMPONENTS.EQUIPMENT, { slots: { mainHand: sword.uid } })
 
   // 2. Spawn enemies at predefined locations

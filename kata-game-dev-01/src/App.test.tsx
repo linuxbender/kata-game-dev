@@ -74,7 +74,7 @@ describe('App', () => {
     const { container } = render(<App />)
     const debugInfo = container.querySelector('.debug-info-hotkeys')
     expect(debugInfo).toBeTruthy()
-    expect(debugInfo?.textContent).toContain('Level Hotkeys')
+    expect(debugInfo?.textContent).toContain('Forest')
   })
 
   it('should render debug buttons', () => {
@@ -170,7 +170,7 @@ describe('App', () => {
       // Should show hint to toggle debug overlay
       const hint = container.querySelector('.debug-overlay-hint')
       expect(hint).toBeTruthy()
-      expect(hint?.textContent).toContain("Press 'D'")
+      expect(hint?.textContent).toContain("Press 'F3'")
     })
   })
 })
