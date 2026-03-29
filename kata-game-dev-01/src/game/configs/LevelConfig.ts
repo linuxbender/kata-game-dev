@@ -80,6 +80,8 @@ export interface LevelDefinition {
   /** Background color or theme */
   theme?: {
     backgroundColor?: string
+    /** Background renderer key: 'forest' | 'cave' | 'fortress' */
+    themeType?: string
   }
 }
 
@@ -126,7 +128,8 @@ export const LEVEL_1_FOREST: LevelDefinition = {
     height: 1000
   },
   theme: {
-    backgroundColor: '#2d4a2b'
+    backgroundColor: '#2d4a2b',
+    themeType: 'forest'
   }
 }
 
@@ -174,7 +177,8 @@ export const LEVEL_2_CAVE: LevelDefinition = {
     height: 1000
   },
   theme: {
-    backgroundColor: '#1a1a2e'
+    backgroundColor: '#1a1a2e',
+    themeType: 'cave'
   }
 }
 
@@ -222,7 +226,8 @@ export const LEVEL_3_FORTRESS: LevelDefinition = {
     height: 1200
   },
   theme: {
-    backgroundColor: '#3d2817'
+    backgroundColor: '#3d2817',
+    themeType: 'fortress'
   }
 }
 

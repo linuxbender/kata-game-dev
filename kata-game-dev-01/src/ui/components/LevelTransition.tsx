@@ -16,8 +16,8 @@ export interface LevelTransitionProps {
 
 /**
  * Level Transition Component
- * 
- * Displays a fade effect with level name and description during level transitions.
+ *
+ * Cinematic fade with animated level title during scene changes.
  * Animation sequence:
  * 1. Fade in (black screen with level info)
  * 2. Hold for a moment
@@ -29,12 +29,11 @@ export const LevelTransition: React.FC<LevelTransitionProps> = ({
   levelName,
   levelDescription,
   duration = 2000,
-  onComplete
+  onComplete,
 }) => {
   const [phase, setPhase] = useState<'fade-in' | 'hold' | 'fade-out' | 'hidden'>('hidden')
 
   // Keep onComplete in a ref so changing the callback never restarts the timers.
-  // Only isActive and duration should control the timer lifecycle.
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
 
@@ -57,41 +56,27 @@ export const LevelTransition: React.FC<LevelTransitionProps> = ({
     }, fadeIn + hold + fadeOut)
 
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-  }, [isActive, duration])
+  }, [isActive, duration])   // onComplete intentionally omitted — stable via ref
 
-  if (phase === 'hidden') {
-    return null
-  }
+  if (phase === 'hidden') return null
 
-  const opacity = phase === 'fade-in' 
-    ? 1
-    : phase === 'hold'
-    ? 1
-    : 0
-
-  const transitionDuration = phase === 'fade-in'
-    ? `${duration * 0.4}ms`
-    : phase === 'fade-out'
+  const opacity = phase === 'fade-out' ? 0 : 1
+  const transitionDuration = phase === 'fade-in' || phase === 'fade-out'
     ? `${duration * 0.4}ms`
     : '0ms'
 
   return (
     <div
       className="level-transition-overlay"
-      style={{
-        opacity,
-        transition: `opacity ${transitionDuration} ease-in-out`
-      }}
+      style={{ opacity, transition: `opacity ${transitionDuration} ease-in-out` }}
     >
+      <div className="level-transition-entering">Entering Area</div>
+      <div className="level-transition-line" />
       {levelName && (
-        <div className="level-transition-title">
-          {levelName}
-        </div>
+        <div className="level-transition-title">{levelName}</div>
       )}
       {levelDescription && (
-        <div className="level-transition-description">
-          {levelDescription}
-        </div>
+        <div className="level-transition-description">{levelDescription}</div>
       )}
     </div>
   )

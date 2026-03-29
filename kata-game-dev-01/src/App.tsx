@@ -15,12 +15,15 @@ import { HealthBar } from '@ui/components/HealthBar'
 import { startDialog, chooseDialogOption, endDialog, getDialogState, pickupItem } from '@game/GameActions'
 import { createItemInstance } from '@game/configs/ItemConfig'
 import { getDialogTree, getDialogNode } from '@game/configs/DialogConfig'
+import { getLevelById } from '@game/configs/LevelConfig'
 import type { DialogNode } from '@game/configs/DialogConfig'
 import InventoryPanel from '@ui/components/InventoryPanel'
 import EquipmentPanel from '@ui/components/EquipmentPanel'
 import SaveLoadMenu from '@ui/components/SaveLoadMenu'
 import DialogBox from '@ui/components/DialogBox'
 import ControlsOverlay from '@ui/components/ControlsOverlay'
+import GameStartScreen from '@ui/components/GameStartScreen'
+import GameOverScreen from '@ui/components/GameOverScreen'
 import { WeaponSystem } from '@engine/systems/WeaponSystem'
 import ITEM_CATALOG from '@game/configs/ItemConfig'
 import { LevelManager } from '@game/LevelManager'
@@ -38,9 +41,11 @@ import { useUIState } from '@hooks/useUIState'
 // ---------------------------------------------------------------------------
 const LEVEL_MAP: Record<string, { id: string; name: string; description: string }> = {
   '1': { id: 'level_1_forest',   name: 'Forest Clearing', description: 'A peaceful forest with scattered goblin scouts' },
-  '2': { id: 'level_2_cave',     name: 'Dark Cave',       description: 'A dangerous cave filled with goblins and orcs' },
-  '3': { id: 'level_3_fortress', name: 'Orc Fortress',    description: 'A heavily fortified orc stronghold' },
+  '2': { id: 'level_2_cave',     name: 'Dark Cave',       description: 'A dangerous cave filled with goblins and orcs'  },
+  '3': { id: 'level_3_fortress', name: 'Orc Fortress',    description: 'A heavily fortified orc stronghold'             },
 }
+
+type GamePhase = 'menu' | 'playing' | 'dead'
 
 // ---------------------------------------------------------------------------
 // App Component
@@ -50,10 +55,20 @@ const App = () => {
   const { config: persistedConfig, setConfig: persistConfig } = useQuadConfig()
 
   // Refs to ECS objects that must not trigger re-renders
-  const worldRef      = useRef<ReactiveWorld | null>(null)
-  const playerRef     = useRef<number | null>(null)
+  const worldRef         = useRef<ReactiveWorld | null>(null)
+  const playerRef        = useRef<number | null>(null)
   const levelManagerRef  = useRef<LevelManager | null>(null)
   const inputSystemRef   = useRef<ReturnType<typeof createInputSystem> | null>(null)
+  const renderSystemRef  = useRef<ReturnType<typeof createRenderSystem> | null>(null)
+  const gameStartTimeRef = useRef<number>(0)
+
+  // Game phase — 'menu' shows the title screen, 'playing' runs the loop, 'dead' shows game over
+  const [gamePhase, setGamePhase] = useState<GamePhase>('menu')
+  const gamePhaseRef = useRef<GamePhase>('menu')
+  const setPhase = (p: GamePhase) => { gamePhaseRef.current = p; setGamePhase(p) }
+
+  // Restart key — incrementing it re-triggers the game init useEffect
+  const [restartKey, setRestartKey] = useState(0)
 
   // State exposed to the React tree via GameStateProvider
   const [gameWorld,    setGameWorld]    = useState<ReactiveWorld | null>(null)
@@ -63,14 +78,17 @@ const App = () => {
   const ui = useUIState()
 
   // Dialog state lives here because it needs ECS coordination
-  const [dialogVisible,        setDialogVisible]        = useState(false)
-  const [currentDialogNode,    setCurrentDialogNode]    = useState<DialogNode | null>(null)
-  const [currentDialogTreeId,  setCurrentDialogTreeId]  = useState<string | null>(null)
-  const [questFlags,           setQuestFlags]           = useState<Record<string, unknown>>({})
+  const [dialogVisible,       setDialogVisible]       = useState(false)
+  const [currentDialogNode,   setCurrentDialogNode]   = useState<DialogNode | null>(null)
+  const [currentDialogTreeId, setCurrentDialogTreeId] = useState<string | null>(null)
+  const [questFlags,          setQuestFlags]           = useState<Record<string, unknown>>({})
 
   // Level transition overlay
   const [transitionActive, setTransitionActive] = useState(false)
   const [transitionLevel,  setTransitionLevel]  = useState<{ name: string; description: string } | null>(null)
+
+  // Elapsed time for game over screen
+  const [elapsedTime, setElapsedTime] = useState(0)
 
   // Performance metrics (updated every 10 frames)
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
@@ -102,15 +120,25 @@ const App = () => {
   }, [])
 
   const loadLevel = useCallback((key: string) => {
-    const lm = levelManagerRef.current
-    const level = LEVEL_MAP[key]
-    if (!lm || !level) return
-    setTransitionLevel({ name: level.name, description: level.description })
+    const lm  = levelManagerRef.current
+    const lvl = LEVEL_MAP[key]
+    if (!lm || !lvl) return
+
+    // Update background theme in render system
+    const def      = getLevelById(lvl.id)
+    const themeType = def?.theme?.themeType ?? 'forest'
+    // Store it in the ref so the getThemeType callback picks it up
+    currentThemeTypeRef.current = themeType
+
+    setTransitionLevel({ name: lvl.name, description: lvl.description })
     setTransitionActive(true)
-    setTimeout(() => lm.transitionToLevel(level.id, () => {}), 400)
+    setTimeout(() => lm.transitionToLevel(lvl.id, () => {}), 400)
   }, [])
 
-  // Weapon attack — runs inside the game loop, extracted to keep the loop readable
+  // Ref for the current theme type (read by getThemeType callback inside render system)
+  const currentThemeTypeRef = useRef<string>('forest')
+
+  // Weapon attack — runs inside the game loop
   const handleWeaponAttack = useCallback((world: ReactiveWorld, player: number) => {
     const inputSystem = inputSystemRef.current
     if (!inputSystem?.isActionPressed(INPUT_ACTIONS.ACTION_PRIMARY)) return
@@ -119,7 +147,7 @@ const App = () => {
     const equipment = world.getComponent(player, COMPONENTS.EQUIPMENT)
     const inventory: any[] = (world.getComponent(player, COMPONENTS.INVENTORY) as any[]) || []
     const mainHandUid = equipment?.slots?.mainHand
-    const invItem = mainHandUid ? inventory.find(it => it.uid === mainHandUid) : null
+    const invItem = mainHandUid ? inventory.find((it: any) => it.uid === mainHandUid) : null
     if (!invItem) return
 
     const def = ITEM_CATALOG[invItem.id]
@@ -149,34 +177,27 @@ const App = () => {
   }, [])
 
   // ---------------------------------------------------------------------------
-  // Hotkeys — single listener, only active once canvas is ready
+  // Hotkeys — only active when playing
   // ---------------------------------------------------------------------------
   useHotkeys({
-    // UI panels — all conflict-free with WASD movement (W/A/S/D)
-    i:      ui.toggleInventory,            // Inventory
-    e:      ui.toggleEquipment,            // Equipment
-    p:      ui.toggleSaveLoad,             // Pause / Save-Load  (was S — conflicted with move-down)
-    f3:     (ev) => { ev.preventDefault(); ui.toggleDebugOverlay() }, // Debug overlay — F3 is layout-independent
-    '?':    ui.toggleControls,             // Controls reference
-
-    // Debug helpers (H/J don't conflict with WASD)
+    i:      ui.toggleInventory,
+    e:      ui.toggleEquipment,
+    p:      ui.toggleSaveLoad,
+    f3:     (ev) => { ev.preventDefault(); ui.toggleDebugOverlay() },
+    '?':    ui.toggleControls,
     h:      () => modifyHealth(-10),
     j:      () => modifyHealth(10),
-
-    // Level switching
     '1':    () => loadLevel('1'),
     '2':    () => loadLevel('2'),
     '3':    () => loadLevel('3'),
-
-    // Close top-most open panel
     escape: (ev) => { ev.preventDefault(); ui.handleEsc(dialogVisible, closeDialog) },
-  }, ready)
+  }, ready && gamePhase === 'playing')
 
   // ---------------------------------------------------------------------------
   // Game initialization & loop
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!ready) return
+    if (!ready || gamePhase !== 'playing') return
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -184,8 +205,8 @@ const App = () => {
       const reactiveWorld = new ReactiveWorld()
       const { player, quadConfig } = createWorld(reactiveWorld)
 
-      worldRef.current   = reactiveWorld
-      playerRef.current  = player
+      worldRef.current  = reactiveWorld
+      playerRef.current = player
       setGameWorld(reactiveWorld)
       setGamePlayerId(player)
 
@@ -193,9 +214,10 @@ const App = () => {
       levelManager.setPlayer(player)
       levelManagerRef.current = levelManager
       levelManager.loadLevel('level_1_forest')
+      currentThemeTypeRef.current = 'forest'
 
-      const { update: movementUpdate }  = createMovementSystem()
-      const { update: enemyAIUpdate }   = createEnemyAISystem()
+      const { update: movementUpdate } = createMovementSystem()
+      const { update: enemyAIUpdate }  = createEnemyAISystem()
 
       const inputSystem = createInputSystem({ movementSpeed: 150, enableDiagonalNormalization: true })
       inputSystemRef.current = inputSystem
@@ -213,41 +235,38 @@ const App = () => {
         }
       )
 
-      const { update: renderUpdate } = createRenderSystem(canvas, player, {
+      const renderSys = createRenderSystem(canvas, player, {
         dpr,
         camera: { dampingSeconds: 0.12, deadZoneRadius: 3, lookAheadFactor: 0.2 },
+        getThemeType: () => currentThemeTypeRef.current,
       }, quad)
+      renderSystemRef.current = renderSys
 
-      // Populate quad tree with initial entities
-      const trackedEntities = new Set<number>()
+      // Populate quad tree
       for (const e of reactiveWorld.query(COMPONENTS.TRANSFORM, COMPONENTS.RENDERABLE)) {
         const t = e.comps[0]
         quad.insert({ x: t.x, y: t.y, entity: e.entity })
-        trackedEntities.add(e.entity)
       }
 
-      // Keep quad tree in sync with ECS transform changes
       const unsubTransform = reactiveWorld.onComponentEvent((ev: any) => {
         if (ev.name !== COMPONENTS.TRANSFORM) return
         const id = ev.entity
         if (ev.type === EVENT_TYPES.ADD) {
           quad.insert({ x: ev.component.x, y: ev.component.y, entity: id })
-          trackedEntities.add(id)
         } else if (ev.type === EVENT_TYPES.UPDATE) {
           const pos = reactiveWorld.getComponent(id, COMPONENTS.TRANSFORM)
           if (pos) {
             if (quad.has(id)) quad.update(id, pos.x, pos.y)
-            else { quad.insert({ x: pos.x, y: pos.y, entity: id }); trackedEntities.add(id) }
+            else quad.insert({ x: pos.x, y: pos.y, entity: id })
           }
         } else if (ev.type === EVENT_TYPES.REMOVE) {
           if (quad.has(id)) quad.remove(id)
-          trackedEntities.delete(id)
         }
       })
 
       inputSystem.attach()
 
-      // Canvas click: start dialog when player clicks an NPC
+      // Canvas click → dialog
       const handleCanvasClick = (e: MouseEvent) => {
         const w = worldRef.current; const p = playerRef.current
         if (!w || p == null) return
@@ -255,7 +274,6 @@ const App = () => {
         const playerTransform = w.getComponent(p, COMPONENTS.TRANSFORM)
         if (!playerTransform) return
 
-        // Convert screen coords → world coords (camera is centered on player)
         const worldX = (e.clientX - rect.left) - canvasSize.width  / 2 + playerTransform.x
         const worldY = (e.clientY - rect.top)  - canvasSize.height / 2 + playerTransform.y
 
@@ -263,7 +281,6 @@ const App = () => {
           const [nt, meta] = npc.comps
           const dist = Math.sqrt((nt.x - worldX) ** 2 + (nt.y - worldY) ** 2)
           if (dist < 30) {
-            // dialogTreeId is set per NPC in its metadata (EntityBlueprints.ts)
             const treeId: string = meta.dialogTreeId ?? 'merchant_dialog'
             if (startDialog(w, p, npc.entity, treeId)) {
               const tree = getDialogTree(treeId)
@@ -280,12 +297,12 @@ const App = () => {
       }
       canvas.addEventListener('click', handleCanvasClick)
 
-      // Performance monitor
       const performanceMonitor = createPerformanceMonitor(60)
-      let last = performance.now()
+      gameStartTimeRef.current = performance.now()
+      let last    = performance.now()
       let running = true
 
-      // Main game loop
+      // ── Main game loop ───────────────────────────────────────────────────
       const frame = (now: number) => {
         performanceMonitor.startFrame()
         const dt = Math.min((now - last) / 1000, 0.05)
@@ -306,9 +323,27 @@ const App = () => {
 
         handleWeaponAttack(reactiveWorld, player)
 
+        // Remove dead enemies from world
+        for (const e of reactiveWorld.query(COMPONENTS.HEALTH, COMPONENTS.METADATA)) {
+          const [hp, meta] = e.comps as [any, any]
+          if (meta?.isEnemy && hp?.current <= 0) {
+            reactiveWorld.removeEntity(e.entity)
+          }
+        }
+
+        // ── Player death detection ────────────────────────────────────────
+        const playerHp = reactiveWorld.getComponent(player, COMPONENTS.HEALTH) as any
+        if (playerHp && playerHp.current <= 0 && gamePhaseRef.current === 'playing') {
+          const elapsed = (performance.now() - gameStartTimeRef.current) / 1000
+          setElapsedTime(elapsed)
+          setPhase('dead')
+          running = false
+          return
+        }
+
         t = performance.now()
         try {
-          renderUpdate(reactiveWorld, dt, { width: canvasSize.width, height: canvasSize.height }, quad)
+          renderSys.update(reactiveWorld, dt, { width: canvasSize.width, height: canvasSize.height }, quad)
         } catch (err) {
           console.error('[Frame] Render error:', err)
         }
@@ -335,11 +370,30 @@ const App = () => {
     } catch (error) {
       console.error('[App] Initialization error:', error)
     }
-  }, [ready, dpr])
+  }, [ready, dpr, gamePhase === 'playing' ? restartKey : -1])
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+
+  // Title screen
+  if (gamePhase === 'menu') {
+    return <GameStartScreen onStart={() => setPhase('playing')} />
+  }
+
+  // Game over screen
+  if (gamePhase === 'dead') {
+    return (
+      <GameOverScreen
+        elapsedSeconds={elapsedTime}
+        onRestart={() => {
+          setPhase('playing')
+          setRestartKey(k => k + 1)
+        }}
+      />
+    )
+  }
+
   return (
     <GameStateProvider world={gameWorld} playerId={gamePlayerId}>
       <GameHUD

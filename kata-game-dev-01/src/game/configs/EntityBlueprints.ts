@@ -83,7 +83,7 @@ export const PLAYER_BLUEPRINT: EntityBlueprint = {
       collisionMask: 0xffff,
     },
     renderable: {
-      type: 'circle',
+      type: 'player',
       color: '#0088ff',
       radius: 10,
       layer: 10,
@@ -155,7 +155,7 @@ export const GOBLIN_BLUEPRINT: EntityBlueprint = {
       height: 15,
     },
     renderable: {
-      type: 'circle',
+      type: 'goblin',
       color: '#00ff00',
       radius: 8,
       layer: 5,
@@ -220,7 +220,7 @@ export const ORC_BLUEPRINT: EntityBlueprint = {
       height: 25,
     },
     renderable: {
-      type: 'circle',
+      type: 'orc',
       color: '#88ff00',
       radius: 12,
       layer: 5,
@@ -278,7 +278,7 @@ export const MERCHANT_BLUEPRINT: EntityBlueprint = {
       y: 0,
     },
     renderable: {
-      type: 'circle',
+      type: 'merchant',
       color: '#ffaa00',
       radius: 10,
       layer: 5,
@@ -336,7 +336,7 @@ export const HEALTH_POTION_BLUEPRINT: EntityBlueprint = {
       isTrigger: true,
     },
     renderable: {
-      type: 'circle',
+      type: 'potion_health',
       color: '#ff0000',
       radius: 4,
       layer: 3,

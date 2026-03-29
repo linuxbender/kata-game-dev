@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, act } from '@testing-library/react'
+import { render, act, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import App from './App'
 
 // Mock canvas and other browser APIs
 beforeEach(() => {
-  // Mock HTMLCanvasElement.getContext
+  const mockGradient = { addColorStop: vi.fn() }
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
     fillRect: vi.fn(),
     clearRect: vi.fn(),
@@ -25,149 +26,189 @@ beforeEach(() => {
     scale: vi.fn(),
     rotate: vi.fn(),
     arc: vi.fn(),
+    arcTo: vi.fn(),
     fill: vi.fn(),
     measureText: vi.fn(() => ({ width: 0 })),
     transform: vi.fn(),
     rect: vi.fn(),
     clip: vi.fn(),
+    ellipse: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    bezierCurveTo: vi.fn(),
+    strokeRect: vi.fn(),
+    roundRect: vi.fn(),
+    setLineDash: vi.fn(),
+    createLinearGradient: vi.fn(() => mockGradient),
+    createRadialGradient: vi.fn(() => mockGradient),
+    createPattern: vi.fn(() => null),
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    font: '10px sans-serif',
+    textAlign: 'start',
+    textBaseline: 'alphabetic',
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+    shadowColor: 'rgba(0,0,0,0)',
+    shadowBlur: 0,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
   })) as any
 
-  // Mock requestAnimationFrame
   global.requestAnimationFrame = vi.fn((cb) => setTimeout(cb, 16)) as any
   global.cancelAnimationFrame = vi.fn()
-
-  // Mock performance.now
   global.performance.now = vi.fn(() => Date.now())
 })
 
+/** Helper: render App and click through the start screen */
+async function renderPlaying() {
+  const user = userEvent.setup()
+  const result = render(<App />)
+  // Start screen is shown first — click it to transition to 'playing'
+  const startScreen = result.container.querySelector('.start-screen')
+  if (startScreen) {
+    await user.click(startScreen)
+  }
+  return result
+}
+
 describe('App', () => {
-  it('should render without crashing', () => {
-    const { container } = render(<App />)
-    expect(container).toBeDefined()
+  describe('Start Screen', () => {
+    it('should render without crashing', () => {
+      const { container } = render(<App />)
+      expect(container).toBeDefined()
+    })
+
+    it('should show the start screen on initial load', () => {
+      const { container } = render(<App />)
+      expect(container.querySelector('.start-screen')).toBeTruthy()
+      expect(container.querySelector('.start-screen__title')).toBeTruthy()
+    })
+
+    it('should show start prompt on start screen', () => {
+      render(<App />)
+      expect(screen.getByText(/PRESS ENTER OR CLICK TO START/i)).toBeDefined()
+    })
+
+    it('should show feature highlights on start screen', () => {
+      render(<App />)
+      expect(screen.getByText(/Combat/i)).toBeDefined()
+    })
   })
 
-  it('should render canvas element', () => {
-    const { container } = render(<App />)
-    const canvas = container.querySelector('canvas')
-    expect(canvas).toBeTruthy()
-  })
+  describe('Playing state', () => {
+    it('should render canvas after starting', async () => {
+      const { container } = await renderPlaying()
+      const canvas = container.querySelector('canvas')
+      expect(canvas).toBeTruthy()
+    })
 
-  it('should render game HUD container with correct class', () => {
-    const { container } = render(<App />)
-    const gameContainer = container.querySelector('.game-hud-container')
-    expect(gameContainer).toBeTruthy()
-  })
+    it('should render game HUD container after starting', async () => {
+      const { container } = await renderPlaying()
+      const gameContainer = container.querySelector('.game-hud-container')
+      expect(gameContainer).toBeTruthy()
+    })
 
-  it('should render health bar overlay', () => {
-    const { container } = render(<App />)
-    const healthBarOverlay = container.querySelector('.health-bar-overlay')
-    expect(healthBarOverlay).toBeTruthy()
-  })
+    it('should render health bar overlay after starting', async () => {
+      const { container } = await renderPlaying()
+      const healthBarOverlay = container.querySelector('.health-bar-overlay')
+      expect(healthBarOverlay).toBeTruthy()
+    })
 
-  it('should render debug info panel', () => {
-    const { container } = render(<App />)
-    const debugInfo = container.querySelector('.debug-info')
-    expect(debugInfo).toBeTruthy()
-  })
+    it('should render debug info panel after starting', async () => {
+      const { container } = await renderPlaying()
+      const debugInfo = container.querySelector('.debug-info')
+      expect(debugInfo).toBeTruthy()
+    })
 
-  it('should display level hotkeys hint in debug info', () => {
-    const { container } = render(<App />)
-    const debugInfo = container.querySelector('.debug-info-hotkeys')
-    expect(debugInfo).toBeTruthy()
-    expect(debugInfo?.textContent).toContain('Forest')
-  })
+    it('should display level hotkeys hint in debug info', async () => {
+      const { container } = await renderPlaying()
+      const debugInfo = container.querySelector('.debug-info-hotkeys')
+      expect(debugInfo).toBeTruthy()
+      expect(debugInfo?.textContent).toContain('Forest')
+    })
 
-  it('should render debug buttons', () => {
-    const { container } = render(<App />)
-    const debugButtons = container.querySelector('.debug-buttons')
-    expect(debugButtons).toBeTruthy()
-  })
+    it('should render debug buttons after starting', async () => {
+      const { container } = await renderPlaying()
+      const debugButtons = container.querySelector('.debug-buttons')
+      expect(debugButtons).toBeTruthy()
+    })
 
-  it('should not render inventory panel initially', () => {
-    const { container } = render(<App />)
-    const inventoryPanel = container.querySelector('.inventory-panel-container')
-    expect(inventoryPanel).toBeFalsy()
-  })
+    it('should not render inventory panel initially', async () => {
+      const { container } = await renderPlaying()
+      const inventoryPanel = container.querySelector('.inventory-panel-container')
+      expect(inventoryPanel).toBeFalsy()
+    })
 
-  it('should not render equipment panel initially', () => {
-    const { container } = render(<App />)
-    const equipmentPanel = container.querySelector('.equipment-panel-container')
-    expect(equipmentPanel).toBeFalsy()
-  })
+    it('should not render equipment panel initially', async () => {
+      const { container } = await renderPlaying()
+      const equipmentPanel = container.querySelector('.equipment-panel-container')
+      expect(equipmentPanel).toBeFalsy()
+    })
 
-  it('should not render dialog box initially', () => {
-    const { container } = render(<App />)
-    const dialogBox = container.querySelector('.dialog-box-overlay')
-    expect(dialogBox).toBeFalsy()
-  })
+    it('should not render dialog box initially', async () => {
+      const { container } = await renderPlaying()
+      const dialogBox = container.querySelector('.dialog-box-overlay')
+      expect(dialogBox).toBeFalsy()
+    })
 
-  it('should handle dialog state initialization', () => {
-    const { container } = render(<App />)
-    // Verify initial state - no dialog visible
-    const dialogBox = container.querySelector('.dialog-box')
-    expect(dialogBox).toBeFalsy()
-  })
+    it('should handle dialog state initialization', async () => {
+      const { container } = await renderPlaying()
+      const dialogBox = container.querySelector('.dialog-box')
+      expect(dialogBox).toBeFalsy()
+    })
 
-  it('should render with dialog system components ready', () => {
-    const { container } = render(<App />)
-    // Verify canvas is ready for NPC click detection
-    const canvas = container.querySelector('canvas')
-    expect(canvas).toBeTruthy()
-    // Verify game world is initialized (required for dialog system)
-    expect(container).toBeDefined()
-  })
+    it('should render with dialog system components ready', async () => {
+      const { container } = await renderPlaying()
+      const canvas = container.querySelector('canvas')
+      expect(canvas).toBeTruthy()
+      expect(container).toBeDefined()
+    })
 
-  it('should initialize quest flags state', () => {
-    // Test that the component renders without errors
-    // Quest flags state is internal and managed by React
-    const { container } = render(<App />)
-    expect(container).toBeDefined()
+    it('should initialize quest flags state', async () => {
+      const { container } = await renderPlaying()
+      expect(container).toBeDefined()
+    })
   })
 
   describe('Performance Monitoring', () => {
-    it('should initialize performance monitor', () => {
-      const { container } = render(<App />)
-      // Verify app renders successfully with performance monitoring
+    it('should initialize performance monitor', async () => {
+      const { container } = await renderPlaying()
       expect(container).toBeDefined()
       const canvas = container.querySelector('canvas')
       expect(canvas).toBeTruthy()
     })
 
-    it('should render DebugOverlay component', () => {
-      const { container } = render(<App />)
-      // DebugOverlay should render (even if not visible initially)
-      // Check for the hint text when overlay is not visible
+    it('should render DebugOverlay component', async () => {
+      const { container } = await renderPlaying()
       const debugHint = container.querySelector('.debug-overlay-hint')
       expect(debugHint).toBeTruthy()
     })
 
-    it('should track system timings in game loop', () => {
-      const { container } = render(<App />)
-      // Verify the app initializes with performance tracking
-      // Performance metrics are tracked internally in the game loop
+    it('should track system timings in game loop', async () => {
+      const { container } = await renderPlaying()
       expect(container).toBeDefined()
       const canvas = container.querySelector('canvas')
       expect(canvas).toBeTruthy()
     })
 
-    it('should initialize with default performance metrics state', () => {
-      const { container } = render(<App />)
-      // Performance metrics state is initialized with default values
+    it('should initialize with default performance metrics state', async () => {
+      const { container } = await renderPlaying()
       expect(container).toBeDefined()
     })
   })
 
   describe('Debug Overlay Integration', () => {
-    it('should not show debug overlay initially', () => {
-      const { container } = render(<App />)
-      // Debug overlay should not be visible initially
+    it('should not show debug overlay initially', async () => {
+      const { container } = await renderPlaying()
       const overlay = container.querySelector('.debug-overlay')
       expect(overlay).toBeFalsy()
     })
 
-    it('should render debug overlay hint when not visible', () => {
-      const { container } = render(<App />)
-      // Should show hint to toggle debug overlay
+    it('should render debug overlay hint when not visible', async () => {
+      const { container } = await renderPlaying()
       const hint = container.querySelector('.debug-overlay-hint')
       expect(hint).toBeTruthy()
       expect(hint?.textContent).toContain("Press 'F3'")
